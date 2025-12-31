@@ -2,49 +2,45 @@
 
 ## Overview
 
-This interactive tool visualizes how different occupations and college majors may be impacted by AI technologies. It allows users to explore two key dimensions of AI's potential impact (positive and negative).
+This interactive tool visualizes how different occupations may be impacted by AI technologies. Users can select occupations and see their AI exposure levels displayed on a tiered visualization (Very High to Very Low exposure).
 
 ## Features
 
-- Toggle between Occupations and College Majors views
-- Filter college majors by field of study
-- Filter occupations by sector/industry categories
-- Compare up to 2 occupations/majors side-by-side in a dedicated comparison view
-- Detailed analysis for each occupation or major, including:
-    - Visualizations of replacement risk and complementary AI potential
-    - Interpretive analysis of AI impact
-    - For majors: related occupations and their AI exposure levels
-- Search functionality to quickly locate specific majors or occupations
-- Sort options (alphabetical, exposure level)
+- Select up to 6 preferred occupations from a list of 974 occupations
+- Visual tiered display showing AI exposure levels (red-yellow-green scale)
+- Top 3 most and least exposed occupations from your selections
+- Search functionality to explore additional occupations
+- Qualtrics integration for embedding in surveys
 
 ## Technical Details
+
 The tool is built with React and uses:
 
 - React hooks for state management
 - Dynamic CSS-in-JS styling for responsive design
-- Conditional rendering based on selected view modes
-- Interactive data visualization with color-coded risk indicators
+- CSV data loading for occupation rankings
+- PostMessage API for Qualtrics integration
 
 ## Data Sources
-Currently, the tool uses simulated data for demonstation purposes.
+
+Occupation AI exposure rankings are based on research data (occupations.csv).
 
 ## Usage
 
 This tool is designed for:
-- Students making educational and career decisions
+- Students making career decisions
 - Career counselors and academic advisors
 - Workforce development professionals
-- Educators developing curriculum aligned with future skills needs
 - Researchers studying AI's impact on labor markets
 
 ## Installation
 
-```
+```bash
 # Clone the repository
-git clone https://github.com/yourusername/degree-exposure.git
+git clone https://github.com/germanjreyes/occ_exposure.git
 
 # Navigate to project directory
-cd degree-exposure
+cd occ_exposure
 
 # Install dependencies
 npm install
@@ -53,5 +49,15 @@ npm install
 npm start
 ```
 
+## Deployment
+
+```bash
+# Build and deploy to GitHub Pages
+npm run deploy
+```
+
+The app will be available at: https://germanjreyes.github.io/occ_exposure/
+
 ## Contributing
+
 Contributions are welcome! Please feel free to submit a Pull Request.
