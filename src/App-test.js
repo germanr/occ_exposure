@@ -16,71 +16,185 @@ npm install
 npm start
 */
 
-
 import React, { useState, useEffect } from 'react';
 
-/* Stores data for each occupation. The data is the two digit SOC code, the name of the occupation, the predicted percent median wage change from Kogan et al. (2023), the 2024 median salary, the predicted actual median wage change from Kogan et al. (2023), the number of times a user
-has viewed the detailed information, the time each user has spent viewing the detailed information, the top majors that individuals in the occupation have, and the top related occupations from O*NET
+// CSV URL - update this when you change the GitHub location
+const CSV_URL = 'https://github.com/germanjreyes/occ_exposure/blob/master/occupations.csv';
+
+/* Stores data for each occupation. The data is the two digit SOC code, the name of the occupation, 
+   the 2024 median salary, the number of times a user has viewed the detailed information, 
+   the time each user has spent viewing the detailed information, the top majors that individuals 
+   in the occupation have, and the top related occupations from O*NET
 */
 const mockData = {
     occupations: [
-        { id: 0, two_digit_soc_code: 11, name: "Management", exposure: 3.91, median_salary: "122,090", median_salary_change: "$4,774", new_median_salary: "126,864", count: 0, time: 0, major: ["Business", "Engineering", "Social Sciences"], occupation: [16, 1, 3] },
-        { id: 1, two_digit_soc_code: 13, name: "Business and Financial", exposure: 6.16, median_salary: "80,920", median_salary_change: "$4,985", new_median_salary: "85,905", count: 0, time: 0, major: ["Business", "Social Sciences", "Engineering"], occupation: [16, 0, 2] },
-        { id: 2, two_digit_soc_code: 15, name: "Computer and Mathematical", exposure: 3.84, median_salary: "105,850", median_salary_change: "$4,065", new_median_salary: "109,915", count: 0, time: 0, major: ["Computer and Information Sciences", "Business", "Engineering"], occupation: [3, 16, 19] },
-        { id: 3, two_digit_soc_code: 17, name: "Architecture and Engineering", exposure: 3.07, median_salary: "97,310", median_salary_change: "$2,987", new_median_salary: "100,297", count: 0, time: 0, major: ["Engineering", "Business", "Architecture"], occupation: [20, 19, 18] },
-        { id: 4, two_digit_soc_code: 19, name: "Life, Physical, and Social Science", exposure: 3.41, median_salary: "78,980", median_salary_change: "$2,693", new_median_salary: "81,673", count: 0, time: 0, major: ["Biology and Life Sciences", "Physical Sciences", "Psychology"], occupation: [9, 3, 7] },
-        { id: 5, two_digit_soc_code: 21, name: "Community and Social Service", exposure: 2.23, median_salary: "57,530", median_salary_change: "$1,283", new_median_salary: "58,813", count: 0, time: 0, major: ["Psychology", "Public Affairs, Policy, and Social Work", "Education Administration and Teaching"], occupation: [9, 7, 10] },
-        { id: 6, two_digit_soc_code: 23, name: "Legal", exposure: 2.51, median_salary: "99,990", median_salary_change: "$2,510", new_median_salary: "102,500", count: 0, time: 0, major: ["Social Sciences", "Business", "History"], occupation: [1, 16, 0] },
-        { id: 7, two_digit_soc_code: 25, name: "Educational Instruction and Library", exposure: 3.35, median_salary: "59,220", median_salary_change: "$1,984", new_median_salary: "61,204", count: 0, time: 0, major: ["Education Administration and Teaching", "Business", "Social Sciences"], occupation: [9, 5] },
-        { id: 8, two_digit_soc_code: 27, name: "Arts, Design, Entertainment, Sports, and Media", exposure: 2.75, median_salary: "60,140", median_salary_change: "$1,654", new_median_salary: "61,794", count: 0, time: 0, major: ["Fine Arts", "Communications", "Business"], occupation: [] },
-        { id: 9, two_digit_soc_code: 29, name: "Healthcare Practitioners and Technical", exposure: 2.27, median_salary: "83,090", median_salary_change: "$1,886", new_median_salary: "84,976", count: 0, time: 0, major: ["Medical and Health Sciences and Services", "Biology and Life Sciences", "Psychology"], occupation: [10, 5, 7] },
-        { id: 10, two_digit_soc_code: 31, name: "Healthcare Support", exposure: 3.17, median_salary: "37,180", median_salary_change: "$1,179", new_median_salary: "38,359", count: 0, time: 0, major: ["BioScience", "Patient Care Technician Training", "Medical Assistant Training", "Sports Medicine & Rehabilitation"], occupation: [9, 7, 5] },
-        { id: 11, two_digit_soc_code: 33, name: "Protective Service", exposure: 2.6, median_salary: "50,580", median_salary_change: "$1,315", new_median_salary: "51,895", count: 0, time: 0, major: ["Criminal Justice"], occupation: [21, 16] },
-        { id: 12, two_digit_soc_code: 35, name: "Food Preparation and Serving Related", exposure: 0.27, median_salary: "34,130", median_salary_change: "$92", new_median_salary: "34,222", count: 0, time: 0, major: ["Culinary Arts"], occupation: [20] },
-        { id: 13, two_digit_soc_code: 37, name: "Building and Grounds Cleaning and Maintenance", exposure: 0.42, median_salary: "36,790", median_salary_change: "$155", new_median_salary: "36,945", count: 0, time: 0, major: ["None"], occupation: [20, 18, 19] },
-        { id: 14, two_digit_soc_code: 39, name: "Personal Care and Service", exposure: 1.13, median_salary: "35,110", median_salary_change: "$397", new_median_salary: "35,507", count: 0, time: 0, major: ["Cosmetology", "Manicurist Training"], occupation: [9] },
-        { id: 15, two_digit_soc_code: 41, name: "Sales and Related", exposure: 4.32, median_salary: "37,460", median_salary_change: "$1,618", new_median_salary: "39,078", count: 0, time: 0, major: ["Business & Risk Management"], occupation: [16, 1, 0] },
-        { id: 16, two_digit_soc_code: 43, name: "Office and Administrative Support", exposure: -0.1, median_salary: "46,320", median_salary_change: "-$46", new_median_salary: "46,274", count: 0, time: 0, major: ["Business & Risk Management"], occupation: [1, 0, 15] },
-        { id: 17, two_digit_soc_code: 45, name: "Farming, Fishing, and Forestry", exposure: -0.27, median_salary: "36,750", median_salary_change: "-$99", new_median_salary: "36,651", count: 0, time: 0, major: ["BioScience"], occupation: [20, 18, 19] },
-        { id: 18, two_digit_soc_code: 47, name: "Construction and Extraction", exposure: 2.15, median_salary: "58,360", median_salary_change: "$1,255", new_median_salary: "59.615", count: 0, time: 0, major: ["Construction Technology"], occupation: [20, 19, 21] },
-        { id: 19, two_digit_soc_code: 49, name: "Installation, Maintenance, and Repair", exposure: 1.31, median_salary: "58,230", median_salary_change: "$763", new_median_salary: "58,993", count: 0, time: 0, major: ["Automotive Technology", "Engineering Technologies"], occupation: [20, 18, 21] },
-        { id: 20, two_digit_soc_code: 51, name: "Production", exposure: -2.04, median_salary: "45,960", median_salary_change: "-$938", new_median_salary: "45,022", count: 0, time: 0, major: ["Precision Machining", "Welding Technology"], occupation: [18, 19, 3] },
-        { id: 21, two_digit_soc_code: 53, name: "Transportation and Material Moving", exposure: -0.49, median_salary: "42,740", median_salary_change: "-$209", new_median_salary: "42,531", count: 0, time: 0, major: ["Automotive Technology"], occupation: [20, 19, 18] },
-        // { id: 31, name: "Healthcare Support", exposure: -2.74, median_salary: "37,180", median_salary_change: '-$1,019', new_median_salary: '36,161', count: 0, time: 0, major: ["Medical and Health Sciences and Services", "Business", "Biology and Life Sciences"], occupation: [9, 5, 7] },
-        // { id: 33, name: "Protective Service", exposure: -3.21, median_salary: "50,580", median_salary_change: '-$1,624', new_median_salary: '48,956', count: 0, time: 0, major: ["Criminal Justice and Fire Protection", "Business", "Social Sciences"], occupation: [21, 0, 5] },
-        // { id: 35, name: "Food Preparation and Serving Related", exposure: -5.10, median_salary: "34,130", median_salary_change: '-$1,741', new_median_salary: '32,389', count: 0, time: 0, major: ["Business", "Fine Arts", "Social Sciences"], occupation: [20, 14, 15] },
-        // { id: 37, name: "Building and Grounds Cleaning and Maintenance", exposure: -4.08, median_salary: "36,790", median_salary_change: '-$1,501', new_median_salary: '35,289', count: 0, time: 0, major: ["Business", "Education Administration and Teaching", "Social Sciences"], occupation: [20, 18, 19] },
-        // { id: 39, name: "Personal Care and Service", exposure: -2.32, median_salary: "35,110", median_salary_change: '-$815', new_median_salary: '34,295', count: 0, time: 0, major: ["Business", "Education Administration and Teaching", "Fine Arts"], occupation: [9, 10, 7] },
-        // { id: 41, name: "Sales and Related", exposure: -5.86, median_salary: "37,460", median_salary_change: '-$2,195', new_median_salary: '35,265', count: 0, time: 0, major: ["Business", "Social Sciences", "Communications"], occupation: [16, 1, 0] },
-        // { id: 43, name: "Office and Administrative Support", exposure: -8.66, median_salary: "46,320", median_salary_change: '-$4,011', new_median_salary: '42,309', count: 0, time: 0, major: ["Business", "Social Sciences", "Education Administration and Teaching"], occupation: [1, 0, 15] },
-        // { id: 45, name: "Farming, Fishing, and Forestry", exposure: -4.11, median_salary: "36,750", median_salary_change: '-$1,510', new_median_salary: '35,240', count: 0, time: 0, major: ["Agriculture", "Business", "Education Administration and Teaching"], occupation: [20, 18, 21] },
-        // { id: 47, name: "Construction and Extraction", exposure: -1.78, median_salary: "58,360", median_salary_change: '-$1,039', new_median_salary: '57,321', count: 0, time: 0, major: ["Business", "Engineering", "Social Sciences"], occupation: [20, 19, 21] },
-        // { id: 49, name: "Installation, Maintenance, and Repair", exposure: -2.12, median_salary: "58,230", median_salary_change: '-$1,234', new_median_salary: '56,996', count: 0, time: 0, major: ["Business", "Engineering", "Computer and Information Sciences"], occupation: [20, 18, 21] },
-        // { id: 51, name: "Production", exposure: -6.34, median_salary: "45,960", median_salary_change: '-$2,914', new_median_salary: '43,046', count: 0, time: 0, major: ["Business", "Engineering", "Fine Arts"], occupation: [18, 19, 21] },
-        // { id: 53, name: "Transportation and Material Moving", exposure: -6.88, median_salary: "42,740", median_salary_change: '-$2,941', new_median_salary: '39,799', count: 0, time: 0, major: ["Business", "Engineering", "Social Sciences"], occupation: [20, 18, 19] },
+        { id: 0, two_digit_soc_code: 11, name: "Management", median_salary: "122,090", count: 0, time: 0, major: ["Business", "Engineering", "Social Sciences"], occupation: [16, 1, 3] },
+        { id: 1, two_digit_soc_code: 13, name: "Business and Financial", median_salary: "80,920", count: 0, time: 0, major: ["Business", "Social Sciences", "Engineering"], occupation: [16, 0, 2] },
+        { id: 2, two_digit_soc_code: 15, name: "Computer and Mathematical", median_salary: "105,850", count: 0, time: 0, major: ["Computer and Information Sciences", "Business", "Engineering"], occupation: [3, 16, 19] },
+        { id: 3, two_digit_soc_code: 17, name: "Architecture and Engineering", median_salary: "97,310", count: 0, time: 0, major: ["Engineering", "Business", "Architecture"], occupation: [20, 19, 18] },
+        { id: 4, two_digit_soc_code: 19, name: "Life, Physical, and Social Science", median_salary: "78,980", count: 0, time: 0, major: ["Biology and Life Sciences", "Physical Sciences", "Psychology"], occupation: [9, 3, 7] },
+        { id: 5, two_digit_soc_code: 21, name: "Community and Social Service", median_salary: "57,530", count: 0, time: 0, major: ["Psychology", "Public Affairs, Policy, and Social Work", "Education Administration and Teaching"], occupation: [9, 7, 10] },
+        { id: 6, two_digit_soc_code: 23, name: "Legal", median_salary: "99,990", count: 0, time: 0, major: ["Social Sciences", "Business", "History"], occupation: [1, 16, 0] },
+        { id: 7, two_digit_soc_code: 25, name: "Educational Instruction and Library", median_salary: "59,220", count: 0, time: 0, major: ["Education Administration and Teaching", "Business", "Social Sciences"], occupation: [9, 5] },
+        { id: 8, two_digit_soc_code: 27, name: "Arts, Design, Entertainment, Sports, and Media", median_salary: "60,140", count: 0, time: 0, major: ["Fine Arts", "Communications", "Business"], occupation: [] },
+        { id: 9, two_digit_soc_code: 29, name: "Healthcare Practitioners and Technical", median_salary: "83,090", count: 0, time: 0, major: ["Medical and Health Sciences and Services", "Biology and Life Sciences", "Psychology"], occupation: [10, 5, 7] },
+        { id: 10, two_digit_soc_code: 31, name: "Healthcare Support", median_salary: "37,180", count: 0, time: 0, major: ["BioScience", "Patient Care Technician Training", "Medical Assistant Training", "Sports Medicine & Rehabilitation"], occupation: [9, 7, 5] },
+        { id: 11, two_digit_soc_code: 33, name: "Protective Service", median_salary: "50,580", count: 0, time: 0, major: ["Criminal Justice"], occupation: [21, 16] },
+        { id: 12, two_digit_soc_code: 35, name: "Food Preparation and Serving Related", median_salary: "34,130", count: 0, time: 0, major: ["Culinary Arts"], occupation: [20] },
+        { id: 13, two_digit_soc_code: 37, name: "Building and Grounds Cleaning and Maintenance", median_salary: "36,790", count: 0, time: 0, major: ["None"], occupation: [20, 18, 19] },
+        { id: 14, two_digit_soc_code: 39, name: "Personal Care and Service", median_salary: "35,110", count: 0, time: 0, major: ["Cosmetology", "Manicurist Training"], occupation: [9] },
+        { id: 15, two_digit_soc_code: 41, name: "Sales and Related", median_salary: "37,460", count: 0, time: 0, major: ["Business & Risk Management"], occupation: [16, 1, 0] },
+        { id: 16, two_digit_soc_code: 43, name: "Office and Administrative Support", median_salary: "46,320", count: 0, time: 0, major: ["Business & Risk Management"], occupation: [1, 0, 15] },
+        { id: 17, two_digit_soc_code: 45, name: "Farming, Fishing, and Forestry", median_salary: "36,750", count: 0, time: 0, major: ["BioScience"], occupation: [20, 18, 19] },
+        { id: 18, two_digit_soc_code: 47, name: "Construction and Extraction", median_salary: "58,360", count: 0, time: 0, major: ["Construction Technology"], occupation: [20, 19, 21] },
+        { id: 19, two_digit_soc_code: 49, name: "Installation, Maintenance, and Repair", median_salary: "58,230", count: 0, time: 0, major: ["Automotive Technology", "Engineering Technologies"], occupation: [20, 18, 21] },
+        { id: 20, two_digit_soc_code: 51, name: "Production", median_salary: "45,960", count: 0, time: 0, major: ["Precision Machining", "Welding Technology"], occupation: [18, 19, 3] },
+        { id: 21, two_digit_soc_code: 53, name: "Transportation and Material Moving", median_salary: "42,740", count: 0, time: 0, major: ["Automotive Technology"], occupation: [20, 19, 18] },
     ]
 };
 
+// TieredSteps Component - Shows where an occupation ranks on the exposure scale
+function TieredSteps({ ranking, occupation }) {
+    // 10 tiers from most exposed (1-10) to least exposed (91-100)
+    const tiers = [
+        { label: '1-10', color: '#dc2626' },   // Red - Most exposed
+        { label: '11-20', color: '#ea580c' },  // Orange-red
+        { label: '21-30', color: '#f97316' },  // Orange
+        { label: '31-40', color: '#fb923c' },  // Light orange
+        { label: '41-50', color: '#facc15' },  // Yellow
+        { label: '51-60', color: '#a3e635' },  // Yellow-green
+        { label: '61-70', color: '#4ade80' },  // Light green
+        { label: '71-80', color: '#22c55e' },  // Green
+        { label: '81-90', color: '#14b8a6' },  // Teal
+        { label: '91-100', color: '#0ea5e9' }, // Blue - Least exposed
+    ];
+
+    // Determine which tier (0-9) based on ranking (1-100)
+    const getTierIndex = (rank) => Math.min(Math.floor((rank - 1) / 10), 9);
+
+    const activeTier = getTierIndex(ranking);
+
+    return (
+        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+            <div style={{ marginBottom: '16px', color: '#334155', fontSize: '16px' }}>
+                <strong>{occupation}</strong>
+            </div>
+
+            <div style={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'center',
+                gap: '4px',
+                marginBottom: '12px'
+            }}>
+                {tiers.map((tier, index) => {
+                    const isActive = index === activeTier;
+                    const height = 100 - index * 6; // Descending heights
+
+                    return (
+                        <div key={tier.label} style={{ position: 'relative' }}>
+                            {isActive && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: `-${height + 24}px`,
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    backgroundColor: tier.color,
+                                    color: '#fff',
+                                    padding: '3px 8px',
+                                    borderRadius: '10px',
+                                    fontSize: '10px',
+                                    fontWeight: '600',
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                                }}>
+                                    ▼ #{ranking}
+                                </div>
+                            )}
+                            <div style={{
+                                width: '36px',
+                                height: `${height}px`,
+                                backgroundColor: isActive ? tier.color : `${tier.color}22`,
+                                border: `2px solid ${tier.color}`,
+                                borderRadius: '4px 4px 0 0',
+                                display: 'flex',
+                                alignItems: 'flex-end',
+                                justifyContent: 'center',
+                                paddingBottom: '4px'
+                            }}>
+                                <span style={{
+                                    fontSize: '8px',
+                                    fontWeight: '600',
+                                    color: isActive ? '#fff' : tier.color,
+                                }}>
+                                    {tier.label}
+                                </span>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                maxWidth: '420px',
+                margin: '0 auto',
+                fontSize: '10px',
+                color: '#64748b'
+            }}>
+                <span>← Most Exposed</span>
+                <span>Least Exposed →</span>
+            </div>
+        </div>
+    );
+}
+
+// Helper function to get exposure level description based on ranking
+function getExposureLevel(ranking) {
+    if (ranking <= 10) return { level: 'Very High', color: '#dc2626' };
+    if (ranking <= 20) return { level: 'High', color: '#ea580c' };
+    if (ranking <= 30) return { level: 'Moderately High', color: '#f97316' };
+    if (ranking <= 40) return { level: 'Moderate-High', color: '#fb923c' };
+    if (ranking <= 50) return { level: 'Moderate', color: '#facc15' };
+    if (ranking <= 60) return { level: 'Moderate-Low', color: '#a3e635' };
+    if (ranking <= 70) return { level: 'Moderately Low', color: '#4ade80' };
+    if (ranking <= 80) return { level: 'Low', color: '#22c55e' };
+    if (ranking <= 90) return { level: 'Very Low', color: '#14b8a6' };
+    return { level: 'Minimal', color: '#0ea5e9' };
+}
+
+// Helper function to get button background color based on ranking
+function getButtonColor(ranking) {
+    if (ranking <= 30) return '#fee2e2'; // Light red for high exposure
+    if (ranking <= 70) return '#fef9c3'; // Light yellow for medium exposure
+    return '#dcfce7'; // Light green for low exposure
+}
+
 // Main function that creates the visualization
 function AIExposureVisualization() {
-    // The below opoerations help define states that are used to know when items are selected, track which terms are searched, when to change pages, how much time has elapsed, etc.
+    // State for CSV data (ranking lookup)
+    const [rankingData, setRankingData] = useState({});
+    const [csvLoading, setCsvLoading] = useState(true);
+    const [csvError, setCsvError] = useState(null);
+
     // Used to store the current user-inputted search term
     const [searchTerm, setSearchTerm] = useState('');
-    // Used to store the list of user-inputted searcg terms
+    // Used to store the list of user-inputted search terms
     const [searchTerms, setSearchTerms] = useState('');
-    // Used to store the sorted list of preffered occupations
+    // Used to store the sorted list of preferred occupations
     const [ranked, setRanked] = useState(null);
-    // Used to track which occupation is being clicked on the second and thid pages
+    // Used to track which occupation is being clicked on the second and third pages
     const [selectedItem, setSelectedItem] = useState(null);
     // Used to track which occupation is being clicked on the fourth page
     const [selectedItemEnd, setSelectedItemEnd] = useState(null);
-    // Used to store the list of preffered occupations
+    // Used to store the list of preferred occupations
     const [list, setList] = useState([]);
-    // Used to determine whether to disply the first page
+    // Used to determine whether to display the first page
     const [showSearch, setShowSearch] = useState(true);
-    // Used to determine whether to disply the third page
+    // Used to determine whether to display the third page
     const [showTop, setShowTop] = useState(false);
-    // Used to determine whether to disply the final page
+    // Used to determine whether to display the final page
     const [showEnd, setShowEnd] = useState(false);
     // Used to track the time spent on the current page
     const [timeSpent, setTimeSpent] = useState(0);
@@ -94,13 +208,72 @@ function AIExposureVisualization() {
     // Get correct listing of elements. Ex. X, Y, and Z
     const listFormatter = new Intl.ListFormat('en-US', { style: 'long', type: 'conjunction' });
 
-    // Define top 3 positive and negative occupations based on the occupation's id
-    const most_positive = 1;
-    const second_positive = 15;
-    const third_positive = 0;
-    const most_negative = 20;
-    const second_negative = 21;
-    const third_negative = 17;
+    // Fetch CSV data on component mount
+    useEffect(() => {
+        async function fetchCSV() {
+            try {
+                const response = await fetch(CSV_URL);
+                if (!response.ok) throw new Error('Failed to fetch CSV');
+                const text = await response.text();
+
+                // Parse CSV
+                const lines = text.trim().split('\n');
+                const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+
+                const rankingIndex = headers.indexOf('ranking');
+                const occupationIndex = headers.indexOf('occupation');
+
+                if (rankingIndex === -1 || occupationIndex === -1) {
+                    throw new Error('CSV must have "ranking" and "occupation" columns');
+                }
+
+                const data = {};
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',');
+                    const ranking = parseInt(values[rankingIndex], 10);
+                    const occupation = values[occupationIndex]?.trim().replace(/^"|"$/g, '');
+                    if (occupation && !isNaN(ranking)) {
+                        data[occupation.toLowerCase()] = ranking;
+                    }
+                }
+
+                setRankingData(data);
+                setCsvLoading(false);
+            } catch (err) {
+                console.error('CSV fetch error:', err);
+                setCsvError(err.message);
+                setCsvLoading(false);
+            }
+        }
+
+        fetchCSV();
+    }, []);
+
+    // Helper to get ranking for an occupation (fallback to 50 if not found)
+    const getRanking = (occupationName) => {
+        const key = occupationName.toLowerCase();
+        return rankingData[key] ?? 50; // Default to middle ranking if not found
+    };
+
+    // Define top 3 positive and negative occupations based on rankings from CSV
+    // These will be computed dynamically based on mockData and rankingData
+    const getTopOccupations = () => {
+        if (Object.keys(rankingData).length === 0) {
+            return {
+                mostExposed: [1, 15, 0],
+                leastExposed: [20, 21, 17]
+            };
+        }
+
+        const sortedByRanking = [...mockData.occupations].sort((a, b) => {
+            return getRanking(a.name) - getRanking(b.name);
+        });
+
+        return {
+            mostExposed: sortedByRanking.slice(0, 3).map(o => o.id),
+            leastExposed: sortedByRanking.slice(-3).reverse().map(o => o.id)
+        };
+    };
 
     // Set timer to track how much time a user spends on each occupation and page
     useEffect(() => {
@@ -108,32 +281,8 @@ function AIExposureVisualization() {
             setTimeSpent(prev => prev + 1);
         }, 1000);
 
-        // Cleanup interval on unmount
         return () => clearInterval(timer);
     }, []);
-
-    // Define the colors for occupations when they have postive, negative, and neutral projected wage changes
-    // Color is red
-    const negativeColor = ['#ffcccb'];
-    // Color is grey
-    const neutralColor = ['#c0c0c0'];
-    // Color is green
-    const positiveColor = ['#ccffcc'];
-
-    // Assigns colors to occupations based on their exposure value
-    const getColor = (value) => {
-        const colors = [negativeColor, neutralColor, positiveColor]
-        // Occupations are assigned green if their predicted wage change is greater than or equal to 1%
-        if (value >= 1) {
-            return colors[2];
-        }
-        // Occupations are assigned red if their predicted wage change is less than or equal to -1%
-        else if (value <= -1) {
-            return colors[0];
-        }
-        // Occupations are assigned grey if there predicted wage change is between -1% and 1%
-        return colors[1];
-    };
 
     // Filter and sort data
     let data = [...mockData['occupations']];
@@ -146,18 +295,10 @@ function AIExposureVisualization() {
     // Handles item selection
     const handleItemClick = (item) => {
         if (!list.find(i => i.name === item.name) && list.length < 6) {
-            /* Adds the clicked occupation to the list of preffered occupations if the number
-            of preffered occupation is not greater than 6 and the occupation is not already
-            in the list
-            */
             setList([...list, item]);
-            /* Updates list of search terms the user has typed to search for occupations only
-            if the user typed something in the search bar
-            */
             if (searchTerms === '') {
                 setSearchTerms(searchTerm);
-            }
-            else {
+            } else {
                 setSearchTerms(searchTerms + ', ' + searchTerm);
             }
         }
@@ -172,160 +313,140 @@ function AIExposureVisualization() {
 
     // Updates the time spent on each page of the visualization
     const updateTimeSpentPages = (indexToUpdate, newValue) => {
-        setTimeSpentPages(timeSpentPages.map((item, index) => index === indexToUpdate ? newValue + item : item)); // Map to create a new array with the updated item
+        setTimeSpentPages(timeSpentPages.map((item, index) => index === indexToUpdate ? newValue + item : item));
     };
 
     // Handles user trying to view the detailed information for an occupation
     const handleItemClickDetailed = (item) => {
-        // Updates the time spent looking at each occupation's detailed information
         if (selectedItem) {
             updateTimeSpentDetail(selectedItem.id, timeSpent - timeSpentDetailStart);
         }
-        // Updates the number of views on each occupation's detailed information
         if ((selectedItem && selectedItem !== item) || !selectedItem) {
             item.count++;
         }
-        // Helps hide the detailed information if the same occupation is clicked twice
         setSelectedItem(selectedItem?.name === item.name ? null : item);
-        /* Sets the start time for an occupation's detailed information.
-        This is used to help calculate the total amount of time spent on 
-        an occupation's detailed information.
-        */
         setTimeSpentDetailStart(timeSpent);
     };
 
-
-    // Handles user clicking the even more detailed information that shows specific wage numbers
+    // Handles user clicking the even more detailed information
     const handleItemClickEnd = (item) => {
-        // Updates the time spent looking at each occupation's detailed information
         if (selectedItemEnd) {
             updateTimeSpentDetail(selectedItemEnd.id, timeSpent - timeSpentDetailStart);
         }
-        // Updates the number of views on each occupation's detailed information
         if ((selectedItemEnd && selectedItemEnd !== item) || !selectedItemEnd) {
             item.count++;
         }
-        /* Updates list of search terms the user has typed to search for occupations only
-        if the user typed something in the search bar
-        */
         if (searchTerms === '') {
             setSearchTerms(searchTerm);
-        }
-        else {
+        } else {
             if (selectedItemEnd) {
                 setSearchTerms(searchTerms + ', ' + searchTerm);
             }
         }
-        // Helps hide the detailed information if the same occupation is clicked twice
         setSelectedItemEnd(selectedItemEnd?.name === item.name ? null : item);
-        /* Sets the start time for an occupation's detailed information.
-        This is used to help calculate the total amount of time spent on 
-        an occupation's detailed information.
-        */
         setTimeSpentDetailStart(timeSpent);
     };
 
     // Handler to clear all items from the list
     const handleClearItems = () => {
-        // Optional: confirm before clearing
         if (window.confirm('Are you sure you want to clear the list?')) {
             setList([]);
         }
     };
 
-    // Handles removing an item from the list of preffered occupations
+    // Handles removing an item from the list of preferred occupations
     const handleRemove = (id) => {
         setList(list.filter((item) => item.name !== id));
     };
 
-
     // Handles user clicking the submit button at the beginning of the visualization
     const handleSubmit = () => {
-        // if (list.length === 6) {
-        // Sorts the the preffered occupations in order of highest to lowest exposure
-        const sortedList = [...list].sort((a, b) => b.exposure - a.exposure);
+        // Sort by ranking (most exposed first = lowest ranking number)
+        const sortedList = [...list].sort((a, b) => getRanking(a.name) - getRanking(b.name));
         setRanked(sortedList);
-        // Hides the preffered occupations searcgh bar
         setShowSearch(false);
-        // Updates the time spent on the first page
         updateTimeSpentPages(0, timeSpent);
-        // Resets the time spent on a page back to zero
         setTimeSpent(0);
-        // Clears the last user-inputted search term
         setSearchTerm('');
-        // }
-        // else {
-        //     alert("You need to select 6 occupations before you can move on.");
-        // }
     };
 
     // Handles user clicking the next button
     const handleNext = (page_num, show_top) => {
-        // Determines whether to show the top 3 positively and negatively impacted occupations
         setShowTop(show_top);
-        // Hides the second page information
         setRanked(null);
-        // Updates the time spent looking at each occupation's detailed information
         if (selectedItem) {
-            updateTimeSpentDetail(selectedItem.id, timeSpent - timeSpentDetailStart)
+            updateTimeSpentDetail(selectedItem.id, timeSpent - timeSpentDetailStart);
         }
-        // Hides the detailed information if still being displayed when the next button is pushed
         setSelectedItem(null);
-        // Hides the detailed information if still being displayed when the next button is pushed on the fourth page
         setSelectedItemEnd(null);
-        // Updates the time spent on a given page
         updateTimeSpentPages(page_num, timeSpent);
-        // Resets the time spent on a page back to zero
         setTimeSpent(0);
     };
 
     // Handles user clicking back button
     const handleBack = (page_num, show_top, submit) => {
-        // Determines whether to show the top 3 positively and negatively impacted occupations
         setShowTop(show_top);
-        // Displays the second page
         if (submit) {
-            const sortedList = [...list].sort((a, b) => b.exposure - a.exposure);
+            const sortedList = [...list].sort((a, b) => getRanking(a.name) - getRanking(b.name));
             setRanked(sortedList);
             setShowSearch(false);
         }
-        // Updates the time spent looking at each occupation's detailed information
         if (selectedItem) {
-            updateTimeSpentDetail(selectedItem.id, timeSpent - timeSpentDetailStart)
+            updateTimeSpentDetail(selectedItem.id, timeSpent - timeSpentDetailStart);
         }
-        // Hides the detailed information if still being displayed when the next button is pushed
         setSelectedItem(null);
-        // Hides the detailed information if still being displayed when the next button is pushed on the fourth page
         setSelectedItemEnd(null);
-        // Updates the time spent on a specific page
         updateTimeSpentPages(page_num, timeSpent);
-        // Resets the time spent on a page back to zero
         setTimeSpent(0);
-        // Resets the user-inputted search term if the back button is pressed on the fourth page
         if (page_num === 3) {
             setSearchTerm('');
         }
     };
 
-    // Handles user clicking the end button at the end of the visualization
+    // Handles user clicking the end button
     const handleEnd = () => {
-        // Hide the top 3 positively and negatively impacted occupations
         setShowTop(false);
-        // Shows the information for the final page
         setShowEnd(true);
-        // Updates the time spent looking at each occupation's detailed information
         if (selectedItemEnd) {
-            updateTimeSpentDetail(selectedItemEnd.id, timeSpent - timeSpentDetailStart)
+            updateTimeSpentDetail(selectedItemEnd.id, timeSpent - timeSpentDetailStart);
         }
-        // Hides the detailed information if still being displayed when the next button is pushed on the fourth page
         setSelectedItemEnd(null);
-        // Updates the time spent on the fourth page
         updateTimeSpentPages(3, timeSpent);
-        // Resets the time spent on a page back to zero
         setTimeSpent(0);
-        // Displays a message to the browser to tell it to redisplay the Next button in Qualtrics
         window.parent.postMessage("showNextButton", "*");
     };
+
+    // Show loading state while fetching CSV
+    if (csvLoading) {
+        return (
+            <div style={{
+                maxWidth: '800px',
+                margin: '0 auto',
+                padding: '20px',
+                textAlign: 'center'
+            }}>
+                <p>Loading occupation data...</p>
+            </div>
+        );
+    }
+
+    // Show error if CSV failed to load
+    if (csvError) {
+        return (
+            <div style={{
+                maxWidth: '800px',
+                margin: '0 auto',
+                padding: '20px',
+                textAlign: 'center',
+                color: '#dc2626'
+            }}>
+                <p>Error loading data: {csvError}</p>
+                <p>Please refresh the page to try again.</p>
+            </div>
+        );
+    }
+
+    const topOccupations = getTopOccupations();
 
     return (
         <div style={{
@@ -337,7 +458,7 @@ function AIExposureVisualization() {
             boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
             fontFamily: 'Arial, sans-serif'
         }}>
-            {/* Displays overall header for the visualization*/}
+            {/* Displays overall header for the visualization */}
             <h1 style={{
                 fontSize: '28px',
                 fontWeight: 'bold',
@@ -359,6 +480,7 @@ function AIExposureVisualization() {
                     Please note that there is uncertainty in any predictions on the impact of AI.
                 </p>
             )}
+
             {/* Displays additional header for the second and third pages */}
             {(ranked || showTop) && (
                 <p style={{
@@ -396,7 +518,6 @@ function AIExposureVisualization() {
                             Use the search bar to search for your preferred occupations.
                         </label>
                         <div style={{ position: 'relative' }}>
-                            {/* Handles user input in the search bar*/}
                             <input
                                 type="text"
                                 placeholder='Search for occupations'
@@ -421,34 +542,29 @@ function AIExposureVisualization() {
                                 🔍
                             </div>
                         </div>
-                        <div
-                            style={{
-                                height: '250px',
-                                overflowY: 'scroll'
-                            }}
-                        >
-                            {/* Shows all the occupations based on the search terms*/}
-                            {data.map((item, index) => {
-                                return (
-                                    <div
-                                        key={index}
-                                        onClick={() => handleItemClick(item)}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '10px',
-                                            padding: '8px',
-                                            borderRadius: '6px',
-                                            border: '2px solid transparent',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s ease',
-                                            backgroundColor: 'transparent'
-                                        }}
-                                    >
-                                        {item.name}
-                                    </div>
-                                );
-                            })}
+                        <div style={{
+                            height: '250px',
+                            overflowY: 'scroll'
+                        }}>
+                            {data.map((item, index) => (
+                                <div
+                                    key={index}
+                                    onClick={() => handleItemClick(item)}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        padding: '8px',
+                                        borderRadius: '6px',
+                                        border: '2px solid transparent',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        backgroundColor: 'transparent'
+                                    }}
+                                >
+                                    {item.name}
+                                </div>
+                            ))}
                         </div>
                     </div>
                     <div style={{
@@ -473,11 +589,9 @@ function AIExposureVisualization() {
                                 Preferred Occupations
                             </label>
                             <div>
-                                {/* Displays the items that the user has clicked on the first paege */}
                                 <ol id="preferred_occupations">
                                     {list.map(item => (
                                         <li key={item.name}>{item.name}
-                                            {/* Displays a remove item button */}
                                             <button
                                                 onClick={() => handleRemove(item.name)}
                                                 style={{
@@ -495,17 +609,13 @@ function AIExposureVisualization() {
                                         </li>
                                     ))}
                                 </ol>
-                                {/* Displays a clear all items button */}
                                 <button
                                     onClick={handleClearItems}
                                     disabled={list.length === 0}
-                                    style={{
-                                        cursor: 'pointer',
-                                    }}
+                                    style={{ cursor: 'pointer' }}
                                 >
                                     Clear List
                                 </button>
-                                {/* Displays a submit button */}
                                 <button
                                     onClick={handleSubmit}
                                     disabled={list.length === 0}
@@ -517,13 +627,13 @@ function AIExposureVisualization() {
                                 >
                                     Submit
                                 </button>
-
                             </div>
                         </div>
                     </div>
                 </div>
             )}
-            {/* Displays the second page */}
+
+            {/* Displays the second page - with TieredSteps visualization */}
             {ranked && (
                 <>
                     <div style={{
@@ -540,60 +650,132 @@ function AIExposureVisualization() {
                         }}>
                             <p style={{
                                 textAlign: 'center',
-                                marginBottom: '30px',
+                                marginBottom: '20px',
                                 color: 'black'
                             }}>
-                                Here are the occupations you selected. </p>
+                                Here are the occupations you selected, ranked by their AI exposure level.
+                            </p>
+                            <p style={{ textAlign: 'center', marginBottom: '30px', color: '#666', fontSize: '14px' }}>
+                                Ranking goes from 1 (most exposed to AI) to 100 (least exposed to AI).
+                            </p>
 
-                            They are ranked from most <strong>positively</strong> impacted to most <strong>negatively</strong> impacted.
-                            <div>
-                                {/* Displays the preffered occupations*/}
-                                <ol style={{ paddingLeft: '20px', marginBottom: '10px', lineHeight: '1.6', color: 'black' }}>
-                                    {ranked.map((item, index) => {
-                                        return (
-                                            <li key={item.name} style={{ listStyleType: 'none', marginBottom: '12px' }}>
-                                                {/* Allows users to view the detailed informatiion for an occupation */}
-                                                <button onClick={() => handleItemClickDetailed(item)}
+                            {/* TieredSteps visualizations for each selected occupation */}
+                            <div style={{ marginBottom: '30px' }}>
+                                {ranked.map((item, index) => {
+                                    const ranking = getRanking(item.name);
+                                    return (
+                                        <div key={item.name} style={{
+                                            marginBottom: '20px',
+                                            padding: '15px',
+                                            backgroundColor: '#f8fafc',
+                                            borderRadius: '8px',
+                                            border: '1px solid #e2e8f0'
+                                        }}>
+                                            <TieredSteps ranking={ranking} occupation={item.name} />
+
+                                            {/* Clickable button for more details */}
+                                            <div style={{ textAlign: 'center', marginTop: '10px' }}>
+                                                <button
+                                                    onClick={() => handleItemClickDetailed(item)}
                                                     style={{
-                                                        backgroundColor: getColor(item.exposure),
+                                                        backgroundColor: getButtonColor(ranking),
                                                         border: '1px solid #ccc',
                                                         borderRadius: '6px',
-                                                        padding: '10px 16px',
+                                                        padding: '10px 20px',
                                                         cursor: 'pointer',
                                                         color: '#222',
                                                         fontWeight: 'bold',
-                                                        fontSize: '1rem',
-                                                        width: '100%',
-                                                        textAlign: 'left',
-                                                        transition: 'background 0.2s, color 0.2s'
+                                                        fontSize: '0.9rem',
+                                                        transition: 'background 0.2s'
                                                     }}
-                                                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#e0e7ff'}
-                                                    onMouseOut={e => e.currentTarget.style.backgroundColor = getColor(item.exposure)}
                                                 >
-                                                    {/*Determines whether to display that an occupation has a projected big increase, big decrease, small increase, or small decrease
-                                                    in future wages based on the Kogan et al. (2023) exposure measure */}
-                                                    {index + 1}. {item.name}: A projected <strong>
-                                                        {item.exposure >= 1 ?
-                                                            `big increase` :
-                                                            item.exposure <= -1 ?
-                                                                `big decrease` :
-                                                                item.exposure >= 0 && item.exposure < 1 ?
-                                                                    `small increase` :
-                                                                    `small decrease`
-                                                        }
-                                                    </strong> in money earned.
+                                                    {selectedItem?.name === item.name ? 'Hide Details' : 'Click for more details'}
                                                 </button>
-                                            </li>
-                                        );
-                                    })}
-                                </ol>
+                                            </div>
+
+                                            {/* Expanded details section */}
+                                            {selectedItem?.name === item.name && (
+                                                <div style={{
+                                                    marginTop: '15px',
+                                                    padding: '15px',
+                                                    backgroundColor: '#f0f9ff',
+                                                    borderRadius: '6px',
+                                                    border: '1px solid #bfdbfe'
+                                                }}>
+                                                    <h4 style={{ marginBottom: '10px', fontWeight: 'bold', color: '#1e40af' }}>
+                                                        Detailed Information
+                                                    </h4>
+
+                                                    <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
+                                                        Workers in <strong>{selectedItem.name}</strong> have{' '}
+                                                        <strong style={{ color: getExposureLevel(ranking).color }}>
+                                                            {getExposureLevel(ranking).level}
+                                                        </strong> AI exposure (ranked #{ranking} of 100).
+                                                    </p>
+
+                                                    {selectedItem.occupation && selectedItem.occupation.length > 0 && (
+                                                        <>
+                                                            <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
+                                                                <strong>Similar occupations:</strong>
+                                                            </p>
+                                                            <ul style={{ paddingLeft: '20px', marginBottom: '15px', lineHeight: '1.8', color: 'black' }}>
+                                                                {selectedItem.occupation.map(occupation_number => {
+                                                                    const similarOcc = mockData.occupations[occupation_number];
+                                                                    const similarRanking = getRanking(similarOcc.name);
+                                                                    const similarExposure = getExposureLevel(similarRanking);
+                                                                    return (
+                                                                        <li key={similarOcc.name}>
+                                                                            <strong>{similarOcc.name}</strong>:{' '}
+                                                                            <span style={{ color: similarExposure.color, fontWeight: '600' }}>
+                                                                                {similarExposure.level}
+                                                                            </span> exposure (#{similarRanking})
+                                                                        </li>
+                                                                    );
+                                                                })}
+                                                            </ul>
+                                                        </>
+                                                    )}
+
+                                                    <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
+                                                        <strong>Relevant areas of study:</strong>
+                                                    </p>
+                                                    <ul style={{ paddingLeft: '20px', marginBottom: '10px', lineHeight: '1.8', color: 'black' }}>
+                                                        <li>
+                                                            <strong>{selectedItem.name}</strong>:
+                                                            {selectedItem.two_digit_soc_code <= 27 ?
+                                                                ' Most workers hold at least a bachelor\'s degree.' :
+                                                                selectedItem.two_digit_soc_code >= 31 ?
+                                                                    ' Most workers have less than a bachelor\'s degree.' :
+                                                                    ' A bachelor\'s degree is common but not required.'}
+                                                            {' '}Typical fields: <strong>{listFormatter.format(selectedItem.major)}</strong>.
+                                                        </li>
+                                                        {selectedItem.occupation && selectedItem.occupation.map(occupation_number => {
+                                                            const relatedOcc = mockData.occupations[occupation_number];
+                                                            return (
+                                                                <li key={relatedOcc.name}>
+                                                                    <strong>{relatedOcc.name}</strong>:
+                                                                    {relatedOcc.two_digit_soc_code <= 27 ?
+                                                                        ' Most workers hold at least a bachelor\'s degree.' :
+                                                                        relatedOcc.two_digit_soc_code >= 31 ?
+                                                                            ' Most workers have less than a bachelor\'s degree.' :
+                                                                            ' A bachelor\'s degree is common but not required.'}
+                                                                    {' '}Typical fields: <strong>{listFormatter.format(relatedOcc.major)}</strong>.
+                                                                </li>
+                                                            );
+                                                        })}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
                 </>
             )}
 
-            {/* Displays the third page*/}
+            {/* Displays the third page - Top 3 most and least exposed */}
             {showTop && (
                 <>
                     <div style={{
@@ -613,221 +795,170 @@ function AIExposureVisualization() {
                                 marginBottom: '30px',
                                 color: 'black'
                             }}>Of all occupations, including occupations you did not select...</p>
-                            ...here are the top 3 occupations most <strong>positively</strong> impacted.
+
+                            <p style={{ marginBottom: '15px', color: 'black' }}>
+                                ...here are the top 3 occupations with <strong>highest</strong> AI exposure:
+                            </p>
                             <div>
-                                <ol style={{ paddingLeft: '20px', marginBottom: '10px', lineHeight: '1.6', color: 'black' }}>
-                                    {/* Displays the most positvely impacted occupation*/}
-                                    <li style={{ listStyleType: 'none', marginBottom: '12px' }}>
-                                        {/* Allows users to view the detailed informatiion for an occupation */}
-                                        <button onClick={() => handleItemClickDetailed(mockData.occupations[most_positive])}
-                                            style={{
-                                                backgroundColor: getColor(mockData.occupations[most_positive].exposure),
-                                                border: '1px solid #ccc',
-                                                borderRadius: '6px',
-                                                padding: '10px 16px',
-                                                cursor: 'pointer',
-                                                color: '#222',
-                                                fontWeight: 'bold',
-                                                fontSize: '1rem',
-                                                width: '100%',
-                                                textAlign: 'left',
-                                                transition: 'background 0.2s, color 0.2s'
-                                            }}
-                                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#e0e7ff'}
-                                            onMouseOut={e => e.currentTarget.style.backgroundColor = getColor(mockData.occupations[most_positive].exposure)}
-                                        >
-                                            {/*Determines whether to display that an occupation has a projected big increase, big decrease, small increase, or small decrease
-                                            in future wages based on the Kogan et al. (2023) exposure measure */}
-                                            1. {mockData.occupations[most_positive].name}: A projected <strong>
-                                                {mockData.occupations[most_positive].exposure >= 1 ?
-                                                    `big increase` :
-                                                    mockData.occupations[most_positive].exposure <= -1 ?
-                                                        `big decrease` :
-                                                        mockData.occupations[most_positive].exposure >= 0 && mockData.occupations[most_positive].exposure < 1 ?
-                                                            `small increase` :
-                                                            `small decrease`
-                                                }
-                                            </strong> in money earned.
-                                        </button>
-                                    </li>
-                                    {/* Displays the second most positvely impacted occupation*/}
-                                    <li style={{ listStyleType: 'none', marginBottom: '12px' }}>
-                                        {/* Allows users to view the detailed informatiion for an occupation */}
-                                        <button onClick={() => handleItemClickDetailed(mockData.occupations[second_positive])}
-                                            style={{
-                                                backgroundColor: getColor(mockData.occupations[second_positive].exposure),
-                                                border: '1px solid #ccc',
-                                                borderRadius: '6px',
-                                                padding: '10px 16px',
-                                                cursor: 'pointer',
-                                                color: '#222',
-                                                fontWeight: 'bold',
-                                                fontSize: '1rem',
-                                                width: '100%',
-                                                textAlign: 'left',
-                                                transition: 'background 0.2s, color 0.2s'
-                                            }}
-                                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#e0e7ff'}
-                                            onMouseOut={e => e.currentTarget.style.backgroundColor = getColor(mockData.occupations[second_positive].exposure)}
-                                        >
-                                            {/*Determines whether to display that an occupation has a projected big increase, big decrease, small increase, or small decrease
-                                            in future wages based on the Kogan et al. (2023) exposure measure */}
-                                            2. {mockData.occupations[second_positive].name}: A projected <strong>
-                                                {mockData.occupations[second_positive].exposure >= 1 ?
-                                                    `big increase` :
-                                                    mockData.occupations[second_positive].exposure <= -1 ?
-                                                        `big decrease` :
-                                                        mockData.occupations[second_positive].exposure >= 0 && mockData.occupations[second_positive].exposure < 1 ?
-                                                            `small increase` :
-                                                            `small decrease`
-                                                }
-                                            </strong> in money earned.
-                                        </button>
-                                    </li>
-                                    {/* Displays the third most positvely impacted occupation*/}
-                                    <li style={{ listStyleType: 'none', marginBottom: '12px' }}>
-                                        {/* Allows users to view the detailed informatiion for an occupation */}
-                                        <button onClick={() => handleItemClickDetailed(mockData.occupations[third_positive])}
-                                            style={{
-                                                backgroundColor: getColor(mockData.occupations[third_positive].exposure),
-                                                border: '1px solid #ccc',
-                                                borderRadius: '6px',
-                                                padding: '10px 16px',
-                                                cursor: 'pointer',
-                                                color: '#222',
-                                                fontWeight: 'bold',
-                                                fontSize: '1rem',
-                                                width: '100%',
-                                                textAlign: 'left',
-                                                transition: 'background 0.2s, color 0.2s'
-                                            }}
-                                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#e0e7ff'}
-                                            onMouseOut={e => e.currentTarget.style.backgroundColor = getColor(mockData.occupations[third_positive].exposure)}
-                                        >
-                                            {/*Determines whether to display that an occupation has a projected big increase, big decrease, small increase, or small decrease
-                                            in future wages based on the Kogan et al. (2023) exposure measure */}
-                                            3. {mockData.occupations[third_positive].name}: A projected <strong>
-                                                {mockData.occupations[third_positive].exposure >= 1 ?
-                                                    `big increase` :
-                                                    mockData.occupations[third_positive].exposure <= -1 ?
-                                                        `big decrease` :
-                                                        mockData.occupations[third_positive].exposure >= 0 && mockData.occupations[third_positive].exposure < 1 ?
-                                                            `small increase` :
-                                                            `small decrease`
-                                                }
-                                            </strong> in money earned.
-                                        </button>
-                                    </li>
+                                <ol style={{ paddingLeft: '20px', marginBottom: '20px', lineHeight: '1.6', color: 'black' }}>
+                                    {topOccupations.mostExposed.map((occId, idx) => {
+                                        const occ = mockData.occupations[occId];
+                                        const ranking = getRanking(occ.name);
+                                        const exposure = getExposureLevel(ranking);
+                                        return (
+                                            <li key={occ.name} style={{ listStyleType: 'none', marginBottom: '12px' }}>
+                                                <button
+                                                    onClick={() => handleItemClickDetailed(occ)}
+                                                    style={{
+                                                        backgroundColor: getButtonColor(ranking),
+                                                        border: '1px solid #ccc',
+                                                        borderRadius: '6px',
+                                                        padding: '10px 16px',
+                                                        cursor: 'pointer',
+                                                        color: '#222',
+                                                        fontWeight: 'bold',
+                                                        fontSize: '1rem',
+                                                        width: '100%',
+                                                        textAlign: 'left',
+                                                        transition: 'background 0.2s, color 0.2s'
+                                                    }}
+                                                >
+                                                    {idx + 1}. {occ.name}:{' '}
+                                                    <span style={{ color: exposure.color }}>{exposure.level}</span> exposure (#{ranking})
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
                                 </ol>
                             </div>
-                            ...here are the top 3 occupations most <strong>negatively</strong> impacted.
+
+                            <p style={{ marginBottom: '15px', color: 'black' }}>
+                                ...here are the top 3 occupations with <strong>lowest</strong> AI exposure:
+                            </p>
                             <div>
                                 <ol style={{ paddingLeft: '20px', marginBottom: '10px', lineHeight: '1.6', color: 'black' }}>
-                                    {/* Displays the most negatively impacted occupation*/}
-                                    <li style={{ listStyleType: 'none', marginBottom: '12px' }}>
-                                        {/* Allows users to view the detailed informatiion for an occupation */}
-                                        <button onClick={() => handleItemClickDetailed(mockData.occupations[most_negative])}
-                                            style={{
-                                                backgroundColor: getColor(mockData.occupations[most_negative].exposure),
-                                                border: '1px solid #ccc',
-                                                borderRadius: '6px',
-                                                padding: '10px 16px',
-                                                cursor: 'pointer',
-                                                color: '#222',
-                                                fontWeight: 'bold',
-                                                fontSize: '1rem',
-                                                width: '100%',
-                                                textAlign: 'left',
-                                                transition: 'background 0.2s, color 0.2s'
-                                            }}
-                                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#e0e7ff'}
-                                            onMouseOut={e => e.currentTarget.style.backgroundColor = getColor(mockData.occupations[most_negative].exposure)}
-                                        >
-                                            {/*Determines whether to display that an occupation has a projected big increase, big decrease, small increase, or small decrease
-                                            in future wages based on the Kogan et al. (2023) exposure measure */}
-                                            1. {mockData.occupations[most_negative].name}: A projected <strong>
-                                                {mockData.occupations[most_negative].exposure >= 1 ?
-                                                    `big increase` :
-                                                    mockData.occupations[most_negative].exposure <= -1 ?
-                                                        `big decrease` :
-                                                        mockData.occupations[most_negative].exposure >= 0 && mockData.occupations[most_negative].exposure < 1 ?
-                                                            `small increase` :
-                                                            `small decrease`
-                                                }
-                                            </strong> in money earned.
-                                        </button></li>
-                                    {/* Displays the second most negatively impacted occupation*/}
-                                    <li style={{ listStyleType: 'none', marginBottom: '12px' }}>
-                                        {/* Allows users to view the detailed informatiion for an occupation */}
-                                        <button onClick={() => handleItemClickDetailed(mockData.occupations[second_negative])}
-                                            style={{
-                                                backgroundColor: getColor(mockData.occupations[second_negative].exposure),
-                                                border: '1px solid #ccc',
-                                                borderRadius: '6px',
-                                                padding: '10px 16px',
-                                                cursor: 'pointer',
-                                                color: '#222',
-                                                fontWeight: 'bold',
-                                                fontSize: '1rem',
-                                                width: '100%',
-                                                textAlign: 'left',
-                                                transition: 'background 0.2s, color 0.2s'
-                                            }}
-                                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#e0e7ff'}
-                                            onMouseOut={e => e.currentTarget.style.backgroundColor = getColor(mockData.occupations[second_negative].exposure)}
-                                        >
-                                            {/*Determines whether to display that an occupation has a projected big increase, big decrease, small increase, or small decrease
-                                            in future wages based on the Kogan et al. (2023) exposure measure */}
-                                            2. {mockData.occupations[second_negative].name}: A projected <strong>
-                                                {mockData.occupations[second_negative].exposure >= 1 ?
-                                                    `big increase` :
-                                                    mockData.occupations[second_negative].exposure <= -1 ?
-                                                        `big decrease` :
-                                                        mockData.occupations[second_negative].exposure >= 0 && mockData.occupations[second_negative].exposure < 1 ?
-                                                            `small increase` :
-                                                            `small decrease`
-                                                }
-                                            </strong> in money earned.
-                                        </button></li>
-                                    {/* Displays the third most negatively impacted occupation*/}
-                                    <li style={{ listStyleType: 'none', marginBottom: '12px' }}>
-                                        {/* Allows users to view the detailed informatiion for an occupation */}
-                                        <button onClick={() => handleItemClickDetailed(mockData.occupations[third_negative])}
-                                            style={{
-                                                backgroundColor: getColor(mockData.occupations[third_negative].exposure),
-                                                border: '1px solid #ccc',
-                                                borderRadius: '6px',
-                                                padding: '10px 16px',
-                                                cursor: 'pointer',
-                                                color: '#222',
-                                                fontWeight: 'bold',
-                                                fontSize: '1rem',
-                                                width: '100%',
-                                                textAlign: 'left',
-                                                transition: 'background 0.2s, color 0.2s'
-                                            }}
-                                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#e0e7ff'}
-                                            onMouseOut={e => e.currentTarget.style.backgroundColor = getColor(mockData.occupations[third_negative].exposure)}
-                                        >
-                                            {/*Determines whether to display that an occupation has a projected big increase, big decrease, small increase, or small decrease
-                                            in future wages based on the Kogan et al. (2023) exposure measure */}
-                                            3.  {mockData.occupations[third_negative].name}: A projected <strong>
-                                                {mockData.occupations[third_negative].exposure >= 1 ?
-                                                    `big increase` :
-                                                    mockData.occupations[third_negative].exposure <= -1 ?
-                                                        `big decrease` :
-                                                        mockData.occupations[third_negative].exposure >= 0 && mockData.occupations[third_negative].exposure < 1 ?
-                                                            `small increase` :
-                                                            `small decrease`
-                                                }
-                                            </strong> in money earned.
-                                        </button></li>
+                                    {topOccupations.leastExposed.map((occId, idx) => {
+                                        const occ = mockData.occupations[occId];
+                                        const ranking = getRanking(occ.name);
+                                        const exposure = getExposureLevel(ranking);
+                                        return (
+                                            <li key={occ.name} style={{ listStyleType: 'none', marginBottom: '12px' }}>
+                                                <button
+                                                    onClick={() => handleItemClickDetailed(occ)}
+                                                    style={{
+                                                        backgroundColor: getButtonColor(ranking),
+                                                        border: '1px solid #ccc',
+                                                        borderRadius: '6px',
+                                                        padding: '10px 16px',
+                                                        cursor: 'pointer',
+                                                        color: '#222',
+                                                        fontWeight: 'bold',
+                                                        fontSize: '1rem',
+                                                        width: '100%',
+                                                        textAlign: 'left',
+                                                        transition: 'background 0.2s, color 0.2s'
+                                                    }}
+                                                >
+                                                    {idx + 1}. {occ.name}:{' '}
+                                                    <span style={{ color: exposure.color }}>{exposure.level}</span> exposure (#{ranking})
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
                                 </ol>
                             </div>
-                        </div >
-                    </div >
+                        </div>
+                    </div>
+
+                    {/* Detail view for third page */}
+                    {selectedItem && (
+                        <div style={{
+                            backgroundColor: 'white',
+                            padding: '20px',
+                            borderRadius: '10px',
+                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                            marginBottom: '20px'
+                        }}>
+                            <div style={{
+                                padding: '15px',
+                                backgroundColor: '#f0f9ff',
+                                borderRadius: '6px',
+                                border: '1px solid #bfdbfe'
+                            }}>
+                                <h4 style={{ marginBottom: '10px', fontWeight: 'bold', color: '#1e40af' }}>
+                                    Detailed Information
+                                </h4>
+                                {(() => {
+                                    const ranking = getRanking(selectedItem.name);
+                                    const exposure = getExposureLevel(ranking);
+                                    return (
+                                        <>
+                                            <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
+                                                Workers in <strong>{selectedItem.name}</strong> have{' '}
+                                                <strong style={{ color: exposure.color }}>{exposure.level}</strong> AI exposure
+                                                (ranked #{ranking} of 100).
+                                            </p>
+
+                                            {selectedItem.occupation && selectedItem.occupation.length > 0 && (
+                                                <>
+                                                    <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
+                                                        <strong>Similar occupations:</strong>
+                                                    </p>
+                                                    <ul style={{ paddingLeft: '20px', marginBottom: '15px', lineHeight: '1.8', color: 'black' }}>
+                                                        {selectedItem.occupation.map(occupation_number => {
+                                                            const similarOcc = mockData.occupations[occupation_number];
+                                                            const similarRanking = getRanking(similarOcc.name);
+                                                            const similarExposure = getExposureLevel(similarRanking);
+                                                            return (
+                                                                <li key={similarOcc.name}>
+                                                                    <strong>{similarOcc.name}</strong>:{' '}
+                                                                    <span style={{ color: similarExposure.color, fontWeight: '600' }}>
+                                                                        {similarExposure.level}
+                                                                    </span> exposure (#{similarRanking})
+                                                                </li>
+                                                            );
+                                                        })}
+                                                    </ul>
+                                                </>
+                                            )}
+
+                                            <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
+                                                <strong>Relevant areas of study:</strong>
+                                            </p>
+                                            <ul style={{ paddingLeft: '20px', marginBottom: '10px', lineHeight: '1.8', color: 'black' }}>
+                                                <li>
+                                                    <strong>{selectedItem.name}</strong>:
+                                                    {selectedItem.two_digit_soc_code <= 27 ?
+                                                        ' Most workers hold at least a bachelor\'s degree.' :
+                                                        selectedItem.two_digit_soc_code >= 31 ?
+                                                            ' Most workers have less than a bachelor\'s degree.' :
+                                                            ' A bachelor\'s degree is common but not required.'}
+                                                    {' '}Typical fields: <strong>{listFormatter.format(selectedItem.major)}</strong>.
+                                                </li>
+                                                {selectedItem.occupation && selectedItem.occupation.map(occupation_number => {
+                                                    const relatedOcc = mockData.occupations[occupation_number];
+                                                    return (
+                                                        <li key={relatedOcc.name}>
+                                                            <strong>{relatedOcc.name}</strong>:
+                                                            {relatedOcc.two_digit_soc_code <= 27 ?
+                                                                ' Most workers hold at least a bachelor\'s degree.' :
+                                                                relatedOcc.two_digit_soc_code >= 31 ?
+                                                                    ' Most workers have less than a bachelor\'s degree.' :
+                                                                    ' A bachelor\'s degree is common but not required.'}
+                                                            {' '}Typical fields: <strong>{listFormatter.format(relatedOcc.major)}</strong>.
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                    )}
                 </>
             )}
+
             {/* Displays the fourth page */}
             {!showTop && !ranked && !showSearch && !showEnd && (
                 <>
@@ -837,7 +968,6 @@ function AIExposureVisualization() {
                         gap: '15px',
                         marginBottom: '30px'
                     }}>
-
                         <div style={{
                             backgroundColor: 'white',
                             padding: '15px',
@@ -845,11 +975,12 @@ function AIExposureVisualization() {
                             boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
                         }}>
                             <p>In the search bar below, enter occupations you would like
-                                to find out more information about. We will display today's earnings, how earnings are
-                                predicted to change due to AI, and the predicted future earnings from <a href="https://www.nber.org/papers/w31846">Kogan et. al (2023)</a>.
+                                to find out more information about. We will display the AI exposure ranking
+                                from <a href="https://www.nber.org/papers/w31846">Kogan et. al (2023)</a>.
                             </p>
-                        </div >
-                    </div >
+                        </div>
+                    </div>
+
                     {/* Search Section */}
                     <div style={{
                         backgroundColor: 'white',
@@ -868,7 +999,6 @@ function AIExposureVisualization() {
                             Please click on an occupation to view more information about it.
                         </label>
                         <div style={{ position: 'relative' }}>
-                            {/* Handles user input*/}
                             <input
                                 type="text"
                                 placeholder='Search for occupations'
@@ -893,36 +1023,70 @@ function AIExposureVisualization() {
                                 🔍
                             </div>
                         </div>
-                        <div
-                            style={{
-                                height: '250px',
-                                overflowY: 'scroll'
-                            }}
-                        >
-                            {/* Shows all the occupations based on the search terms*/}
-                            {data.map((item, index) => {
-                                return (
-                                    <div
-                                        key={index}
-                                        onClick={() => handleItemClickEnd(item)}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '10px',
-                                            padding: '8px',
-                                            borderRadius: '6px',
-                                            border: '2px solid transparent',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s ease',
-                                            backgroundColor: 'transparent'
-                                        }}
-                                    >
-                                        {item.name}
-                                    </div>
-                                );
-                            })}
+                        <div style={{
+                            height: '250px',
+                            overflowY: 'scroll'
+                        }}>
+                            {data.map((item, index) => (
+                                <div
+                                    key={index}
+                                    onClick={() => handleItemClickEnd(item)}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '10px',
+                                        padding: '8px',
+                                        borderRadius: '6px',
+                                        border: '2px solid transparent',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease',
+                                        backgroundColor: 'transparent'
+                                    }}
+                                >
+                                    {item.name}
+                                </div>
+                            ))}
                         </div>
                     </div>
+
+                    {/* Detail view for fourth page */}
+                    {selectedItemEnd && (
+                        <div style={{
+                            backgroundColor: 'white',
+                            padding: '20px',
+                            borderRadius: '10px',
+                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                            marginBottom: '20px'
+                        }}>
+                            <TieredSteps
+                                ranking={getRanking(selectedItemEnd.name)}
+                                occupation={selectedItemEnd.name}
+                            />
+                            <div style={{
+                                marginTop: '20px',
+                                padding: '15px',
+                                backgroundColor: '#f0f9ff',
+                                borderRadius: '6px',
+                                border: '1px solid #bfdbfe'
+                            }}>
+                                <h4 style={{ marginBottom: '10px', fontWeight: 'bold', color: '#1e40af' }}>
+                                    More Detailed Information
+                                </h4>
+                                {(() => {
+                                    const ranking = getRanking(selectedItemEnd.name);
+                                    const exposure = getExposureLevel(ranking);
+                                    return (
+                                        <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
+                                            Workers in <strong>{selectedItemEnd.name}</strong> have{' '}
+                                            <strong style={{ color: exposure.color }}>{exposure.level}</strong> AI exposure,
+                                            ranked <strong>#{ranking}</strong> out of 100 occupations
+                                            (where 1 = most exposed, 100 = least exposed).
+                                        </p>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                    )}
                 </>
             )}
 
@@ -935,7 +1099,6 @@ function AIExposureVisualization() {
                         gap: '15px',
                         marginBottom: '30px'
                     }}>
-
                         <div style={{
                             backgroundColor: 'white',
                             padding: '15px',
@@ -943,221 +1106,20 @@ function AIExposureVisualization() {
                             boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
                         }}>
                             <p>Thank you for completing this portion of the survey. Please click Next at the bottom right of the page to continue the survey.</p>
-                            {/* Displays the tracking information. The tracking information includes the number of clicks and time spent on each occupation's
-                            detailed information, the search terms used, and the time spent on each page.*/}
-
-                            {/* <label style={{
-                                display: 'block',
-                                fontSize: '16px',
-                                fontWeight: 'bold',
-                                marginBottom: '10px',
-                                color: 'black'
-                            }}>
-                                Number of clicks and time spent on detailed information for each occupation
-                            </label>
-                            <div>
-                                <ul>
-                                    {mockData.occupations.map(occupation => {
-                                        return (
-                                            <li key={occupation.name}>{occupation.name}: {occupation.count} clicks and {timeSpentDetail[occupation.id].time} seconds</li>
-                                        )
-                                    })}
-                                </ul>
-                            </div>
-                            <label style={{
-                                display: 'block',
-                                fontSize: '16px',
-                                fontWeight: 'bold',
-                                marginBottom: '10px',
-                                color: 'black'
-                            }}>
-                                Amount of time spent on each page
-                            </label>
-                            <div>
-                                <ul>
-                                    <li>Page 1: {timeSpentPages[0]} seconds</li>
-                                    <li>Page 2: {timeSpentPages[1]} seconds</li>
-                                    <li>Page 3: {timeSpentPages[2]} seconds</li>
-                                    <li>Page 4: {timeSpentPages[3]} seconds</li>
-                                </ul>
-                            </div>
-                            <label style={{
-                                display: 'block',
-                                fontSize: '16px',
-                                fontWeight: 'bold',
-                                marginBottom: '10px',
-                                color: 'black'
-                            }}>
-                                What the user searched for
-                            </label>
-                            <div>
-                                <p>Search Terms: {searchTerms}</p>
-                            </div> */}
-                        </div >
-                    </div >
+                        </div>
+                    </div>
                 </>
             )}
 
-            {/* Detail view when an item is selected */}
-            {
-                selectedItem && (
-                    <div style={{
-                        backgroundColor: 'white',
-                        padding: '20px',
-                        borderRadius: '10px',
-                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                        marginBottom: '20px'
-                    }}>
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(2, 1fr)',
-                            gap: '20px',
-                            marginBottom: '20px'
-                        }}>
-                        </div>
-                        <div style={{
-                            marginTop: '20px',
-                            padding: '15px',
-                            backgroundColor: '#f0f9ff',
-                            borderRadius: '6px',
-                            border: '1px solid #bfdbfe'
-                        }}>
-                            <h4 style={{ marginBottom: '10px', fontWeight: 'bold', color: '#1e40af' }}>
-                                Detailed Information
-                            </h4>
-                            {/*Determines whether to display that the selected occupation has a projected big increase, big decrease, small increase, or small decrease
-                            in future wages based on the Kogan et al. (2023) exposure measure */}
-                            <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
-                                Workers in the {selectedItem.name} occupations have a projected <strong>
-                                    {selectedItem.exposure >= 1 ?
-                                        `big increase` :
-                                        selectedItem.exposure <= -1 ?
-                                            `big decrease` :
-                                            selectedItem.exposure >= 0 && selectedItem.exposure < 1 ?
-                                                `small increase` :
-                                                `small decrease`
-                                    }
-                                </strong> in money earned.
-                            </p>
-                            <p style={{ lineHeight: '1.5', color: 'black' }}>
-                                <strong>{`Occupations similar to ${selectedItem.name} are shown below.`}</strong>
-                            </p>
-                            <p style={{ lineHeight: '1.5', color: 'black' }}>
-                                <ol style={{ paddingLeft: '20px', marginBottom: '10px', lineHeight: '1.6', color: 'black' }}>
-                                    {(selectedItem.occupation).map(occupation_number => {
-                                        return (
-                                            <li><span style={{ backgroundColor: getColor(mockData.occupations[occupation_number].exposure) }}>
-                                                {/*Determines whether to display that the similar occupations have a projected big increase, big decrease, small increase, or small decrease
-                                                in future wages based on the Kogan et al. (2023) exposure measure */}
-                                                {mockData.occupations[occupation_number].name}: A projected <strong>
-                                                    {mockData.occupations[occupation_number].exposure >= 1 ?
-                                                        `big increase` :
-                                                        mockData.occupations[occupation_number].exposure <= -1 ?
-                                                            `big decrease` :
-                                                            mockData.occupations[occupation_number].exposure >= 0 && mockData.occupations[occupation_number].exposure < 1 ?
-                                                                `small increase` :
-                                                                `small decrease`
-                                                    }
-                                                </strong> in money earned
-                                            </span></li>
-                                        )
-                                    })}
-                                </ol>
-                            </p>
-                            <p style={{ lineHeight: '1.5', color: 'black' }}>
-                                <strong>Relevant areas of study</strong>
-                            </p>
-                            <p style={{ lineHeight: '1.5', color: 'black' }}>
-                                <ul style={{ textAlign: 'left', listStylePosition: 'inside', paddingLeft: 0, margin: 0 }}>
-                                    <li>
-                                        {/*Determines whether to display that the selected occupation has a majority of workers with a bachelors degree, 
-                                        a pluraity of workers with a bachelors degree, or a majoirty of workers without a college degree*/}
-                                        {selectedItem.name}:
-                                        {selectedItem.two_digit_soc_code <= 27 ?
-                                            ` The majority of workers in this occupation hold at least a college (bachelor’s) degree. ` :
-                                            selectedItem.two_digit_soc_code >= 31 ?
-                                                ` The majority of workers in this occupation have less than a college (bachelor’s) degree. ` :
-                                                ` A college (bachelor’s) degree is the most prevalent credential among workers in this occupation. `
-                                        }
-                                        Workers typically study <strong>{listFormatter.format(selectedItem.major)}</strong>.
-                                    </li>
-                                    {(selectedItem.occupation).map(occupation_number => {
-                                        return (
-                                            <li >
-                                                {/*Determines whether to display that the related occupations have a majority of workers with a bachelors degree, 
-                                                a pluraity of workers with a bachelors degree, or a majoirty of workers without a college degree*/}
-                                                {mockData.occupations[occupation_number].name}:
-                                                {mockData.occupations[occupation_number].two_digit_soc_code <= 27 ?
-                                                    ` The majority of workers in this occupation hold at least a college (bachelor’s) degree. ` :
-                                                    mockData.occupations[occupation_number].two_digit_soc_code >= 31 ?
-                                                        ` The majority of workers in this occupation have less than a college (bachelor’s) degree. ` :
-                                                        ` A college (bachelor’s) degree is the most prevalent credential among workers in this occupation. `
-                                                }
-                                                Workers typically study <strong>{listFormatter.format(mockData.occupations[occupation_number].major)}</strong>.
-                                            </li>
-                                        )
-                                    })}
-                                </ul>
-                            </p>
-                        </div>
-                    </div>
-                )
-            }
-            {/* Detail view when an item is selected at the end of the visualization */}
-            {
-                selectedItemEnd && (
-                    <div style={{
-                        backgroundColor: 'white',
-                        padding: '20px',
-                        borderRadius: '10px',
-                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                        marginBottom: '20px'
-                    }}>
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(2, 1fr)',
-                            gap: '20px',
-                            marginBottom: '20px'
-                        }}>
-                        </div>
-                        <div style={{
-                            marginTop: '20px',
-                            padding: '15px',
-                            backgroundColor: '#f0f9ff',
-                            borderRadius: '6px',
-                            border: '1px solid #bfdbfe'
-                        }}>
-                            <h4 style={{ marginBottom: '10px', fontWeight: 'bold', color: '#1e40af' }}>
-                                More Detailed Information
-                            </h4>
-                            <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
-                                Based on their current median salary of ${selectedItemEnd.median_salary}, workers in the {selectedItemEnd.name} occupations are expected to have a salary&nbsp;
-                                <strong>
-                                    {/*Determines whether to display that an occupation has a projected increase or decrease in future wages based on the Kogan et al. (2023) exposure measure */}
-                                    {selectedItemEnd.exposure > 0 ?
-                                        `increase` :
-                                        `decrease`
-                                    }
-                                </strong> of {selectedItemEnd.median_salary_change} ({selectedItemEnd.exposure}%) to ${selectedItemEnd.new_median_salary}.
-                            </p>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Displays a next button*/}
+            {/* Displays a next button */}
             {ranked && (
-                <div
-                    style={{
-                        paddingBottom: '20px'
-                    }}
-                >
+                <div style={{ paddingBottom: '20px' }}>
                     <button
                         onClick={() => handleNext(1, true)}
                         style={{
                             cursor: 'pointer',
                             float: 'right',
-                            margingBottom: '10px'
+                            marginBottom: '10px'
                         }}
                     >
                         Next
@@ -1165,13 +1127,9 @@ function AIExposureVisualization() {
                 </div>
             )}
 
-            {/* Displays back and next buttons*/}
+            {/* Displays back and next buttons */}
             {showTop && (
-                <div
-                    style={{
-                        paddingBottom: '20px'
-                    }}
-                >
+                <div style={{ paddingBottom: '20px' }}>
                     <div>
                         <button
                             onClick={() => handleBack(2, false, true)}
@@ -1184,28 +1142,22 @@ function AIExposureVisualization() {
                         </button>
                     </div>
                     <div>
-                        {showTop && (
-                            <button
-                                onClick={() => handleNext(2, false)}
-                                style={{
-                                    cursor: 'pointer',
-                                    float: 'right'
-                                }}
-                            >
-                                Next
-                            </button>
-                        )}
+                        <button
+                            onClick={() => handleNext(2, false)}
+                            style={{
+                                cursor: 'pointer',
+                                float: 'right'
+                            }}
+                        >
+                            Next
+                        </button>
                     </div>
                 </div>
             )}
 
-            {/* Displays back and end buttons*/}
+            {/* Displays back and end buttons */}
             {!showTop && !ranked && !showSearch && !showEnd && (
-                <div
-                    style={{
-                        paddingBottom: '20px'
-                    }}
-                >
+                <div style={{ paddingBottom: '20px' }}>
                     <div>
                         <button
                             onClick={() => handleBack(3, true, false)}
@@ -1230,7 +1182,6 @@ function AIExposureVisualization() {
             )}
         </div>
     );
-
 }
 
 export default AIExposureVisualization;
