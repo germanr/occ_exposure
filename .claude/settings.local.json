@@ -5,7 +5,8 @@
       "Bash(npm install:*)",
       "Bash(npm start)",
       "Bash(powershell -Command:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(npm run deploy:*)"
     ]
   }
 }
