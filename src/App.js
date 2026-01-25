@@ -53,36 +53,36 @@ const mockData = {
     ]
 };
 
-// TieredSteps Component - Shows where ALL occupations rank on the exposure scale
-// Now accepts occupations array, getRankingFn, onOccupationClick, and selectedItem
-function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedItem }) {
-    // 5 tiers with red-yellow-green color scale (no blue)
+// TieredSteps Component - Shows where ALL occupations rank on the ALPHABETICAL scale
+// CONTROL VERSION: Uses alphabetical ordering instead of AI exposure
+function TieredSteps({ occupations, getAlphabeticalRankFn, onOccupationClick, selectedItem }) {
+    // 5 tiers based on alphabetical grouping - neutral blue colors
     const tiers = [
-        { label: '1-20', displayLabel: 'Very High', range: [1, 20], color: '#dc2626' },    // Red
-        { label: '21-40', displayLabel: 'High', range: [21, 40], color: '#f97316' },       // Orange
-        { label: '41-60', displayLabel: 'Moderate', range: [41, 60], color: '#eab308' },   // Yellow
-        { label: '61-80', displayLabel: 'Low', range: [61, 80], color: '#22c55e' },        // Green
-        { label: '81-100', displayLabel: 'Very Low', range: [81, 100], color: '#16a34a' }, // Dark Green
+        { label: 'A-E', displayLabel: 'A-E', range: [1, 20], color: '#1e40af' },      // Dark Blue
+        { label: 'F-J', displayLabel: 'F-J', range: [21, 40], color: '#2563eb' },     // Blue
+        { label: 'K-O', displayLabel: 'K-O', range: [41, 60], color: '#3b82f6' },     // Medium Blue
+        { label: 'P-T', displayLabel: 'P-T', range: [61, 80], color: '#60a5fa' },     // Light Blue
+        { label: 'U-Z', displayLabel: 'U-Z', range: [81, 100], color: '#93c5fd' },    // Lighter Blue
     ];
 
-    // Determine which tier (0-4) based on ranking (1-100)
-    const getTierIndex = (rank) => {
-        if (rank <= 20) return 0;
-        if (rank <= 40) return 1;
-        if (rank <= 60) return 2;
-        if (rank <= 80) return 3;
+    // Determine which tier (0-4) based on first letter
+    const getTierIndex = (occupationName) => {
+        const firstLetter = occupationName.charAt(0).toUpperCase();
+        if (firstLetter <= 'E') return 0;
+        if (firstLetter <= 'J') return 1;
+        if (firstLetter <= 'O') return 2;
+        if (firstLetter <= 'T') return 3;
         return 4;
     };
 
     // Group occupations by their tier
     const occupationsByTier = {};
     occupations.forEach(occ => {
-        const ranking = getRankingFn(occ.name);
-        const tierIndex = getTierIndex(ranking);
+        const tierIndex = getTierIndex(occ.name);
         if (!occupationsByTier[tierIndex]) {
             occupationsByTier[tierIndex] = [];
         }
-        occupationsByTier[tierIndex].push({ ...occ, ranking });
+        occupationsByTier[tierIndex].push({ ...occ });
     });
 
     // Calculate dynamic padding based on max stack height
@@ -104,7 +104,7 @@ function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedIte
                 {tiers.map((tier, index) => {
                     const occupationsInTier = occupationsByTier[index] || [];
                     const hasOccupations = occupationsInTier.length > 0;
-                    const height = 160 - index * 20; // Descending heights
+                    const height = 120; // Same height for all tiers (neutral)
 
                     return (
                         <div key={tier.label} style={{ position: 'relative' }}>
@@ -183,19 +183,11 @@ function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedIte
                                 transition: 'background-color 0.3s'
                             }}>
                                 <span style={{
-                                    fontSize: '14px',
+                                    fontSize: '16px',
                                     fontWeight: '700',
                                     color: hasOccupations ? '#fff' : tier.color,
                                 }}>
                                     {tier.displayLabel}
-                                </span>
-                                <span style={{
-                                    fontSize: '11px',
-                                    fontWeight: '500',
-                                    color: hasOccupations ? 'rgba(255,255,255,0.8)' : tier.color,
-                                    marginTop: '2px'
-                                }}>
-                                    {tier.label}
                                 </span>
                             </div>
                         </div>
@@ -212,32 +204,34 @@ function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedIte
                 color: '#64748b',
                 fontWeight: '500'
             }}>
-                <span>← Most Exposed</span>
-                <span>Least Exposed →</span>
+                <span>← A</span>
+                <span>Z →</span>
             </div>
         </div>
     );
 }
 
 // Single occupation TieredSteps (for the fourth page)
-function SingleTieredSteps({ ranking, occupation }) {
-    // 5 tiers with red-yellow-green color scale (no blue)
+// CONTROL VERSION: Alphabetical ordering
+function SingleTieredSteps({ occupation }) {
+    // 5 tiers based on alphabetical grouping - neutral blue colors
     const tiers = [
-        { label: '1-20', displayLabel: 'Very High', color: '#dc2626' },    // Red
-        { label: '21-40', displayLabel: 'High', color: '#f97316' },        // Orange
-        { label: '41-60', displayLabel: 'Moderate', color: '#eab308' },    // Yellow
-        { label: '61-80', displayLabel: 'Low', color: '#22c55e' },         // Green
-        { label: '81-100', displayLabel: 'Very Low', color: '#16a34a' },   // Dark Green
+        { label: 'A-E', displayLabel: 'A-E', color: '#1e40af' },      // Dark Blue
+        { label: 'F-J', displayLabel: 'F-J', color: '#2563eb' },      // Blue
+        { label: 'K-O', displayLabel: 'K-O', color: '#3b82f6' },      // Medium Blue
+        { label: 'P-T', displayLabel: 'P-T', color: '#60a5fa' },      // Light Blue
+        { label: 'U-Z', displayLabel: 'U-Z', color: '#93c5fd' },      // Lighter Blue
     ];
 
-    const getTierIndex = (rank) => {
-        if (rank <= 20) return 0;
-        if (rank <= 40) return 1;
-        if (rank <= 60) return 2;
-        if (rank <= 80) return 3;
+    const getTierIndex = (occupationName) => {
+        const firstLetter = occupationName.charAt(0).toUpperCase();
+        if (firstLetter <= 'E') return 0;
+        if (firstLetter <= 'J') return 1;
+        if (firstLetter <= 'O') return 2;
+        if (firstLetter <= 'T') return 3;
         return 4;
     };
-    const activeTier = getTierIndex(ranking);
+    const activeTier = getTierIndex(occupation);
 
     return (
         <div style={{ textAlign: 'center', marginBottom: '24px', width: '100%' }}>
@@ -255,7 +249,7 @@ function SingleTieredSteps({ ranking, occupation }) {
             }}>
                 {tiers.map((tier, index) => {
                     const isActive = index === activeTier;
-                    const height = 160 - index * 20;
+                    const height = 120; // Same height for all tiers
 
                     return (
                         <div key={tier.label} style={{ position: 'relative' }}>
@@ -307,19 +301,11 @@ function SingleTieredSteps({ ranking, occupation }) {
                                 transition: 'background-color 0.3s'
                             }}>
                                 <span style={{
-                                    fontSize: '14px',
+                                    fontSize: '16px',
                                     fontWeight: '700',
                                     color: isActive ? '#fff' : tier.color,
                                 }}>
                                     {tier.displayLabel}
-                                </span>
-                                <span style={{
-                                    fontSize: '11px',
-                                    fontWeight: '500',
-                                    color: isActive ? 'rgba(255,255,255,0.8)' : tier.color,
-                                    marginTop: '2px'
-                                }}>
-                                    {tier.label}
                                 </span>
                             </div>
                         </div>
@@ -335,29 +321,31 @@ function SingleTieredSteps({ ranking, occupation }) {
                 fontSize: '10px',
                 color: '#64748b'
             }}>
-                <span>← Most Exposed</span>
-                <span>Least Exposed →</span>
+                <span>← A</span>
+                <span>Z →</span>
             </div>
         </div>
     );
 }
 
-// Helper function to get exposure level description based on ranking
-function getExposureLevel(ranking) {
-    if (ranking <= 20) return { level: 'Very High', color: '#dc2626' };  // Red
-    if (ranking <= 40) return { level: 'High', color: '#f97316' };       // Orange
-    if (ranking <= 60) return { level: 'Moderate', color: '#eab308' };   // Yellow
-    if (ranking <= 80) return { level: 'Low', color: '#22c55e' };        // Green
-    return { level: 'Very Low', color: '#16a34a' };                      // Dark Green
+// Helper function to get alphabetical group based on first letter
+function getAlphabeticalGroup(occupationName) {
+    const firstLetter = occupationName.charAt(0).toUpperCase();
+    if (firstLetter <= 'E') return { group: 'A-E', color: '#1e40af' };
+    if (firstLetter <= 'J') return { group: 'F-J', color: '#2563eb' };
+    if (firstLetter <= 'O') return { group: 'K-O', color: '#3b82f6' };
+    if (firstLetter <= 'T') return { group: 'P-T', color: '#60a5fa' };
+    return { group: 'U-Z', color: '#93c5fd' };
 }
 
-// Helper function to get button background color based on ranking
-function getButtonColor(ranking) {
-    if (ranking <= 20) return '#fee2e2'; // Light red for very high exposure
-    if (ranking <= 40) return '#ffedd5'; // Light orange for high exposure
-    if (ranking <= 60) return '#fef9c3'; // Light yellow for moderate exposure
-    if (ranking <= 80) return '#dcfce7'; // Light green for low exposure
-    return '#bbf7d0'; // Lighter green for very low exposure
+// Helper function to get button background color based on alphabetical group
+function getButtonColor(occupationName) {
+    const firstLetter = occupationName.charAt(0).toUpperCase();
+    if (firstLetter <= 'E') return '#dbeafe'; // Light blue
+    if (firstLetter <= 'J') return '#e0e7ff'; // Light indigo
+    if (firstLetter <= 'O') return '#ede9fe'; // Light violet
+    if (firstLetter <= 'T') return '#f3e8ff'; // Light purple
+    return '#fae8ff'; // Light fuchsia
 }
 
 // Main function that creates the visualization
@@ -467,28 +455,30 @@ function AIExposureVisualization() {
         fetchCSV();
     }, []);
 
-    // Helper to get ranking for an occupation (fallback to 50 if not found)
-    const getRanking = (occupationName) => {
-        const key = occupationName.toLowerCase();
-        return rankingData[key] ?? 50; // Default to middle ranking if not found
+    // Helper to get alphabetical rank for an occupation (based on position in sorted list)
+    const getAlphabeticalRank = (occupationName) => {
+        const sortedList = [...occupationList].sort((a, b) => a.name.localeCompare(b.name));
+        const index = sortedList.findIndex(o => o.name.toLowerCase() === occupationName.toLowerCase());
+        if (index === -1) return 50;
+        // Convert to 1-100 scale
+        return Math.floor((index / sortedList.length) * 100) + 1;
     };
 
-    // Define top 3 positive and negative occupations based on rankings from CSV
-    // Uses actual occupation data from CSV (6-digit SOC codes)
-    const getTopOccupations = () => {
+    // Define sample occupations from different alphabetical groups
+    const getSampleOccupations = () => {
         if (occupationList.length === 0) {
             return {
-                mostExposed: [],
-                leastExposed: []
+                earlyAlphabet: [],
+                lateAlphabet: []
             };
         }
 
-        // Sort by ranking (lower = more exposed)
-        const sortedByRanking = [...occupationList].sort((a, b) => a.ranking - b.ranking);
+        // Sort alphabetically
+        const sortedByName = [...occupationList].sort((a, b) => a.name.localeCompare(b.name));
 
         return {
-            mostExposed: sortedByRanking.slice(0, 3),  // Top 3 most exposed (lowest rankings)
-            leastExposed: sortedByRanking.slice(-3).reverse()  // Top 3 least exposed (highest rankings)
+            earlyAlphabet: sortedByName.slice(0, 3),  // First 3 alphabetically
+            lateAlphabet: sortedByName.slice(-3).reverse()  // Last 3 alphabetically
         };
     };
 
@@ -601,7 +591,7 @@ function AIExposureVisualization() {
         if (!searchScreenOccupationsViewed.find(o => o.name === item.name)) {
             setSearchScreenOccupationsViewed(prev => [...prev, {
                 name: item.name,
-                ranking: item.ranking || getRanking(item.name),
+                ranking: item.ranking || getAlphabeticalRank(item.name),
                 viewedAt: Date.now()
             }]);
         }
@@ -621,8 +611,8 @@ function AIExposureVisualization() {
 
     // Handles user clicking the submit button at the beginning of the visualization
     const handleSubmit = () => {
-        // Sort by ranking (most exposed first = lowest ranking number)
-        const sortedList = [...list].sort((a, b) => getRanking(a.name) - getRanking(b.name));
+        // Sort alphabetically instead of by exposure
+        const sortedList = [...list].sort((a, b) => a.name.localeCompare(b.name));
         setRanked(sortedList);
         setShowSearch(false);
         updateTimeSpentPages(0, timeSpent);
@@ -647,7 +637,7 @@ function AIExposureVisualization() {
     const handleBack = (page_num, show_top, submit) => {
         setShowTop(show_top);
         if (submit) {
-            const sortedList = [...list].sort((a, b) => getRanking(a.name) - getRanking(b.name));
+            const sortedList = [...list].sort((a, b) => a.name.localeCompare(b.name));
             setRanked(sortedList);
             setShowSearch(false);
         }
@@ -708,7 +698,7 @@ function AIExposureVisualization() {
         );
     }
 
-    const topOccupations = getTopOccupations();
+    const sampleOccupations = getSampleOccupations();
 
     return (
         <div style={{
@@ -727,7 +717,7 @@ function AIExposureVisualization() {
                 textAlign: 'center',
                 marginBottom: '20px',
                 color: '#333'
-            }}>Exploring the Impact of Artificial Intelligence (AI)</h1>
+            }}>Exploring Occupations</h1>
 
             {/* Displays additional header for the first page */}
             {showSearch && (
@@ -905,10 +895,10 @@ function AIExposureVisualization() {
                                 marginBottom: '10px',
                                 color: 'black'
                             }}>
-                                Here are the occupations you selected and their AI exposure levels.
+                                Here are the occupations you selected, organized alphabetically.
                             </p>
                             <p style={{ textAlign: 'center', marginBottom: '20px', color: '#666', fontSize: '14px' }}>
-                                Ranking goes from 1 (most exposed to AI) to 100 (least exposed to AI).
+                                Occupations are grouped by their first letter (A-E, F-J, K-O, P-T, U-Z).
                             </p>
 
                             {/* Single TieredSteps visualization showing all occupations */}
@@ -922,7 +912,7 @@ function AIExposureVisualization() {
                             }}>
                                 <TieredSteps
                                     occupations={ranked}
-                                    getRankingFn={getRanking}
+                                    getAlphabeticalRankFn={getAlphabeticalRank}
                                     onOccupationClick={handleItemClickDetailed}
                                     selectedItem={selectedItem}
                                 />
@@ -934,14 +924,13 @@ function AIExposureVisualization() {
                             </p>
                             <div>
                                 {ranked.map((item, index) => {
-                                    const ranking = getRanking(item.name);
-                                    const exposure = getExposureLevel(ranking);
+                                    const alphabeticalGroup = getAlphabeticalGroup(item.name);
                                     return (
                                         <div key={item.name} style={{ marginBottom: '10px' }}>
                                             <button
                                                 onClick={() => handleItemClickDetailed(item)}
                                                 style={{
-                                                    backgroundColor: getButtonColor(ranking),
+                                                    backgroundColor: getButtonColor(item.name),
                                                     border: '1px solid #ccc',
                                                     borderRadius: '6px',
                                                     padding: '12px 16px',
@@ -961,11 +950,11 @@ function AIExposureVisualization() {
                                                     {index + 1}. {item.name}
                                                 </span>
                                                 <span style={{ 
-                                                    color: exposure.color, 
+                                                    color: alphabeticalGroup.color, 
                                                     fontSize: '0.85rem',
                                                     fontWeight: '600'
                                                 }}>
-                                                    {exposure.level}
+                                                    {alphabeticalGroup.group}
                                                 </span>
                                             </button>
 
@@ -983,10 +972,10 @@ function AIExposureVisualization() {
                                                     </h4>
 
                                                     <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
-                                                        Workers in <strong>{selectedItem.name}</strong> have{' '}
-                                                        <strong style={{ color: exposure.color }}>
-                                                            {exposure.level}
-                                                        </strong> AI exposure.
+                                                        <strong>{selectedItem.name}</strong> is in the alphabetical group{' '}
+                                                        <strong style={{ color: alphabeticalGroup.color }}>
+                                                            {alphabeticalGroup.group}
+                                                        </strong>.
                                                     </p>
 
                                                     {selectedItem.occupation && selectedItem.occupation.length > 0 && (
@@ -997,14 +986,13 @@ function AIExposureVisualization() {
                                                             <ul style={{ paddingLeft: '20px', marginBottom: '15px', lineHeight: '1.8', color: 'black' }}>
                                                                 {selectedItem.occupation.map(occupation_number => {
                                                                     const similarOcc = mockData.occupations[occupation_number];
-                                                                    const similarRanking = getRanking(similarOcc.name);
-                                                                    const similarExposure = getExposureLevel(similarRanking);
+                                                                    const similarGroup = getAlphabeticalGroup(similarOcc.name);
                                                                     return (
                                                                         <li key={similarOcc.name}>
                                                                             <strong>{similarOcc.name}</strong>:{' '}
-                                                                            <span style={{ color: similarExposure.color, fontWeight: '600' }}>
-                                                                                {similarExposure.level}
-                                                                            </span> exposure (#{similarRanking})
+                                                                            <span style={{ color: similarGroup.color, fontWeight: '600' }}>
+                                                                                {similarGroup.group}
+                                                                            </span>
                                                                         </li>
                                                                     );
                                                                 })}
@@ -1051,7 +1039,7 @@ function AIExposureVisualization() {
                 </>
             )}
 
-            {/* Displays the third page - Top 3 most and least exposed */}
+            {/* Displays the third page - Sample occupations from different alphabetical groups */}
             {showTop && (
                 <>
                     <div style={{
@@ -1066,10 +1054,10 @@ function AIExposureVisualization() {
                             marginBottom: '20px',
                             color: 'black',
                             fontSize: '1.1rem'
-                        }}>Of all occupations, including occupations you did not select...</p>
+                        }}>Here are some sample occupations from different parts of the alphabet...</p>
 
-                        {/* TieredSteps visualization for top 3 most and least exposed */}
-                        {topOccupations.mostExposed.length > 0 && topOccupations.leastExposed.length > 0 && (
+                        {/* TieredSteps visualization for sample occupations */}
+                        {sampleOccupations.earlyAlphabet.length > 0 && sampleOccupations.lateAlphabet.length > 0 && (
                             <div style={{
                                 marginBottom: '30px',
                                 padding: '20px',
@@ -1078,8 +1066,8 @@ function AIExposureVisualization() {
                                 border: '1px solid #e2e8f0'
                             }}>
                                 <TieredSteps
-                                    occupations={[...topOccupations.mostExposed, ...topOccupations.leastExposed]}
-                                    getRankingFn={getRanking}
+                                    occupations={[...sampleOccupations.earlyAlphabet, ...sampleOccupations.lateAlphabet]}
+                                    getAlphabeticalRankFn={getAlphabeticalRank}
                                     onOccupationClick={handleItemClickDetailed}
                                     selectedItem={selectedItem}
                                 />
@@ -1087,21 +1075,20 @@ function AIExposureVisualization() {
                         )}
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-                            {/* Most exposed column */}
+                            {/* Early alphabet column */}
                             <div>
                                 <p style={{ marginBottom: '15px', color: 'black', fontWeight: '500' }}>
-                                    Top 3 occupations with <strong style={{ color: '#dc2626' }}>highest</strong> AI exposure:
+                                    Occupations starting with <strong style={{ color: '#1e40af' }}>early letters</strong>:
                                 </p>
                                 <div>
-                                    {topOccupations.mostExposed.map((occ, idx) => {
-                                        const ranking = occ.ranking;
-                                        const exposure = getExposureLevel(ranking);
+                                    {sampleOccupations.earlyAlphabet.map((occ, idx) => {
+                                        const alphabeticalGroup = getAlphabeticalGroup(occ.name);
                                         return (
                                             <div key={occ.name} style={{ marginBottom: '12px' }}>
                                                 <button
                                                     onClick={() => handleItemClickDetailed(occ)}
                                                     style={{
-                                                        backgroundColor: getButtonColor(ranking),
+                                                        backgroundColor: getButtonColor(occ.name),
                                                         border: '1px solid #ccc',
                                                         borderRadius: '6px',
                                                         padding: '10px 16px',
@@ -1115,7 +1102,7 @@ function AIExposureVisualization() {
                                                     }}
                                                 >
                                                     {idx + 1}. {occ.name}:{' '}
-                                                    <span style={{ color: exposure.color }}>{exposure.level}</span>
+                                                    <span style={{ color: alphabeticalGroup.color }}>{alphabeticalGroup.group}</span>
                                                 </button>
                                             </div>
                                         );
@@ -1123,21 +1110,20 @@ function AIExposureVisualization() {
                                 </div>
                             </div>
 
-                            {/* Least exposed column */}
+                            {/* Late alphabet column */}
                             <div>
                                 <p style={{ marginBottom: '15px', color: 'black', fontWeight: '500' }}>
-                                    Top 3 occupations with <strong style={{ color: '#16a34a' }}>lowest</strong> AI exposure:
+                                    Occupations starting with <strong style={{ color: '#93c5fd' }}>later letters</strong>:
                                 </p>
                                 <div>
-                                    {topOccupations.leastExposed.map((occ, idx) => {
-                                        const ranking = occ.ranking;
-                                        const exposure = getExposureLevel(ranking);
+                                    {sampleOccupations.lateAlphabet.map((occ, idx) => {
+                                        const alphabeticalGroup = getAlphabeticalGroup(occ.name);
                                         return (
                                             <div key={occ.name} style={{ marginBottom: '12px' }}>
                                                 <button
                                                     onClick={() => handleItemClickDetailed(occ)}
                                                     style={{
-                                                        backgroundColor: getButtonColor(ranking),
+                                                        backgroundColor: getButtonColor(occ.name),
                                                         border: '1px solid #ccc',
                                                         borderRadius: '6px',
                                                         padding: '10px 16px',
@@ -1151,7 +1137,7 @@ function AIExposureVisualization() {
                                                     }}
                                                 >
                                                     {idx + 1}. {occ.name}:{' '}
-                                                    <span style={{ color: exposure.color }}>{exposure.level}</span>
+                                                    <span style={{ color: alphabeticalGroup.color }}>{alphabeticalGroup.group}</span>
                                                 </button>
                                             </div>
                                         );
@@ -1180,13 +1166,12 @@ function AIExposureVisualization() {
                                     Detailed Information
                                 </h4>
                                 {(() => {
-                                    const ranking = getRanking(selectedItem.name);
-                                    const exposure = getExposureLevel(ranking);
+                                    const alphabeticalGroup = getAlphabeticalGroup(selectedItem.name);
                                     return (
                                         <>
                                             <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
-                                                Workers in <strong>{selectedItem.name}</strong> have{' '}
-                                                <strong style={{ color: exposure.color }}>{exposure.level}</strong> AI exposure.
+                                                <strong>{selectedItem.name}</strong> is in the alphabetical group{' '}
+                                                <strong style={{ color: alphabeticalGroup.color }}>{alphabeticalGroup.group}</strong>.
                                             </p>
 
                                             {selectedItem.occupation && selectedItem.occupation.length > 0 && (
@@ -1197,14 +1182,13 @@ function AIExposureVisualization() {
                                                     <ul style={{ paddingLeft: '20px', marginBottom: '15px', lineHeight: '1.8', color: 'black' }}>
                                                         {selectedItem.occupation.map(occupation_number => {
                                                             const similarOcc = mockData.occupations[occupation_number];
-                                                            const similarRanking = getRanking(similarOcc.name);
-                                                            const similarExposure = getExposureLevel(similarRanking);
+                                                            const similarGroup = getAlphabeticalGroup(similarOcc.name);
                                                             return (
                                                                 <li key={similarOcc.name}>
                                                                     <strong>{similarOcc.name}</strong>:{' '}
-                                                                    <span style={{ color: similarExposure.color, fontWeight: '600' }}>
-                                                                        {similarExposure.level}
-                                                                    </span> exposure (#{similarRanking})
+                                                                    <span style={{ color: similarGroup.color, fontWeight: '600' }}>
+                                                                        {similarGroup.group}
+                                                                    </span>
                                                                 </li>
                                                             );
                                                         })}
@@ -1348,7 +1332,6 @@ function AIExposureVisualization() {
                             marginBottom: '20px'
                         }}>
                             <SingleTieredSteps
-                                ranking={getRanking(selectedItemEnd.name)}
                                 occupation={selectedItemEnd.name}
                             />
                             <div style={{
@@ -1362,12 +1345,11 @@ function AIExposureVisualization() {
                                     More Detailed Information
                                 </h4>
                                 {(() => {
-                                    const ranking = getRanking(selectedItemEnd.name);
-                                    const exposure = getExposureLevel(ranking);
+                                    const alphabeticalGroup = getAlphabeticalGroup(selectedItemEnd.name);
                                     return (
                                         <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
-                                            Workers in <strong>{selectedItemEnd.name}</strong> have{' '}
-                                            <strong style={{ color: exposure.color }}>{exposure.level}</strong> AI exposure.
+                                            <strong>{selectedItemEnd.name}</strong> is in the alphabetical group{' '}
+                                            <strong style={{ color: alphabeticalGroup.color }}>{alphabeticalGroup.group}</strong>.
                                         </p>
                                     );
                                 })()}
