@@ -54,7 +54,7 @@ const mockData = {
 };
 
 // TieredSteps Component - Shows where ALL occupations rank on the exposure scale
-// Now accepts occupations array, getRankingFn, onOccupationClick, and selectedItem
+// INVERTED VERSION: Bars go DOWN, deeper = more exposed
 function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedItem }) {
     // 5 tiers with red-yellow-green color scale (no blue)
     const tiers = [
@@ -87,32 +87,61 @@ function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedIte
 
     // Calculate dynamic padding based on max stack height
     const maxOccupationsInTier = Math.max(...Object.values(occupationsByTier).map(arr => arr.length), 1);
-    // Each occupation box is ~20px tall (with padding and gap)
-    const dynamicPaddingTop = Math.max(20, maxOccupationsInTier * 40);
+    // Each occupation box is ~40px tall (with padding and gap)
+    const dynamicPaddingBottom = Math.max(20, maxOccupationsInTier * 40);
 
     return (
         <div style={{ textAlign: 'center', marginBottom: '24px', width: '100%' }}>
             <div style={{
                 display: 'flex',
-                alignItems: 'flex-end',
+                alignItems: 'flex-start',
                 justifyContent: 'center',
                 gap: '16px',
                 marginBottom: '16px',
-                paddingTop: `${dynamicPaddingTop}px`,
-                minHeight: `${dynamicPaddingTop + 180}px`
+                paddingBottom: `${dynamicPaddingBottom}px`,
+                minHeight: `${dynamicPaddingBottom + 180}px`
             }}>
                 {tiers.map((tier, index) => {
                     const occupationsInTier = occupationsByTier[index] || [];
                     const hasOccupations = occupationsInTier.length > 0;
-                    const height = 160 - index * 20; // Descending heights
+                    const height = 160 - index * 20; // Descending heights (deeper for more exposed)
 
                     return (
                         <div key={tier.label} style={{ position: 'relative' }}>
-                            {/* Individual arrows for each occupation in this tier */}
+                            {/* The tier bar */}
+                            <div style={{
+                                width: '100px',
+                                height: `${height}px`,
+                                backgroundColor: hasOccupations ? tier.color : `${tier.color}15`,
+                                border: `3px solid ${tier.color}`,
+                                borderRadius: '0 0 12px 12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'background-color 0.3s'
+                            }}>
+                                <span style={{
+                                    fontSize: '14px',
+                                    fontWeight: '700',
+                                    color: hasOccupations ? '#fff' : tier.color,
+                                }}>
+                                    {tier.displayLabel}
+                                </span>
+                                <span style={{
+                                    fontSize: '11px',
+                                    fontWeight: '500',
+                                    color: hasOccupations ? 'rgba(255,255,255,0.8)' : tier.color,
+                                    marginTop: '2px'
+                                }}>
+                                    {tier.label}
+                                </span>
+                            </div>
+                            {/* Individual arrows for each occupation in this tier - now BELOW the bar */}
                             {hasOccupations && (
                                 <div style={{
                                     position: 'absolute',
-                                    bottom: `${height + 12}px`,
+                                    top: `${height + 12}px`,
                                     left: '50%',
                                     transform: 'translateX(-50%)',
                                     display: 'flex',
@@ -136,6 +165,16 @@ function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedIte
                                                 onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
                                                 onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                                             >
+                                                {/* Arrow pointing up (only on first item) */}
+                                                {i === 0 && (
+                                                    <div style={{
+                                                        width: 0,
+                                                        height: 0,
+                                                        borderLeft: '8px solid transparent',
+                                                        borderRight: '8px solid transparent',
+                                                        borderBottom: `10px solid ${tier.color}`
+                                                    }} />
+                                                )}
                                                 {/* Individual occupation box */}
                                                 <div style={{
                                                     backgroundColor: tier.color,
@@ -154,50 +193,11 @@ function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedIte
                                                 }}>
                                                     {occ.name}
                                                 </div>
-                                                {/* Arrow pointing down (only on last item) */}
-                                                {i === occupationsInTier.length - 1 && (
-                                                    <div style={{
-                                                        width: 0,
-                                                        height: 0,
-                                                        borderLeft: '8px solid transparent',
-                                                        borderRight: '8px solid transparent',
-                                                        borderTop: `10px solid ${tier.color}`
-                                                    }} />
-                                                )}
                                             </div>
                                         );
                                     })}
                                 </div>
                             )}
-                            {/* The tier bar */}
-                            <div style={{
-                                width: '100px',
-                                height: `${height}px`,
-                                backgroundColor: hasOccupations ? tier.color : `${tier.color}15`,
-                                border: `3px solid ${tier.color}`,
-                                borderRadius: '12px 12px 0 0',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'background-color 0.3s'
-                            }}>
-                                <span style={{
-                                    fontSize: '14px',
-                                    fontWeight: '700',
-                                    color: hasOccupations ? '#fff' : tier.color,
-                                }}>
-                                    {tier.displayLabel}
-                                </span>
-                                <span style={{
-                                    fontSize: '11px',
-                                    fontWeight: '500',
-                                    color: hasOccupations ? 'rgba(255,255,255,0.8)' : tier.color,
-                                    marginTop: '2px'
-                                }}>
-                                    {tier.label}
-                                </span>
-                            </div>
                         </div>
                     );
                 })}
@@ -220,6 +220,7 @@ function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedIte
 }
 
 // Single occupation TieredSteps (for the fourth page)
+// INVERTED VERSION: Bars go DOWN, deeper = more exposed
 function SingleTieredSteps({ ranking, occupation }) {
     // 5 tiers with red-yellow-green color scale (no blue)
     const tiers = [
@@ -247,11 +248,11 @@ function SingleTieredSteps({ ranking, occupation }) {
 
             <div style={{
                 display: 'flex',
-                alignItems: 'flex-end',
+                alignItems: 'flex-start',
                 justifyContent: 'center',
                 gap: '12px',
                 marginBottom: '16px',
-                paddingTop: '80px'
+                paddingBottom: '80px'
             }}>
                 {tiers.map((tier, index) => {
                     const isActive = index === activeTier;
@@ -259,47 +260,13 @@ function SingleTieredSteps({ ranking, occupation }) {
 
                     return (
                         <div key={tier.label} style={{ position: 'relative' }}>
-                            {isActive && (
-                                <div style={{
-                                    position: 'absolute',
-                                    bottom: `${height + 12}px`,
-                                    left: '50%',
-                                    transform: 'translateX(-50%)',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: '0px'
-                                }}>
-                                    <div style={{
-                                        backgroundColor: tier.color,
-                                        color: '#fff',
-                                        padding: '8px 14px',
-                                        borderRadius: '8px',
-                                        fontSize: '12px',
-                                        fontWeight: '600',
-                                        whiteSpace: 'normal',
-                                        maxWidth: '160px',
-                                        lineHeight: '1.3',
-                                        textAlign: 'center',
-                                        boxShadow: '0 3px 10px rgba(0,0,0,0.2)'
-                                    }}>
-                                        {occupation}
-                                    </div>
-                                    <div style={{
-                                        width: 0,
-                                        height: 0,
-                                        borderLeft: '10px solid transparent',
-                                        borderRight: '10px solid transparent',
-                                        borderTop: `12px solid ${tier.color}`
-                                    }} />
-                                </div>
-                            )}
+                            {/* The tier bar */}
                             <div style={{
                                 width: '100px',
                                 height: `${height}px`,
                                 backgroundColor: isActive ? tier.color : `${tier.color}15`,
                                 border: `3px solid ${tier.color}`,
-                                borderRadius: '12px 12px 0 0',
+                                borderRadius: '0 0 12px 12px',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
@@ -322,6 +289,43 @@ function SingleTieredSteps({ ranking, occupation }) {
                                     {tier.label}
                                 </span>
                             </div>
+                            {/* Occupation label below the bar */}
+                            {isActive && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: `${height + 12}px`,
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '0px'
+                                }}>
+                                    {/* Arrow pointing up */}
+                                    <div style={{
+                                        width: 0,
+                                        height: 0,
+                                        borderLeft: '10px solid transparent',
+                                        borderRight: '10px solid transparent',
+                                        borderBottom: `12px solid ${tier.color}`
+                                    }} />
+                                    <div style={{
+                                        backgroundColor: tier.color,
+                                        color: '#fff',
+                                        padding: '8px 14px',
+                                        borderRadius: '8px',
+                                        fontSize: '12px',
+                                        fontWeight: '600',
+                                        whiteSpace: 'normal',
+                                        maxWidth: '160px',
+                                        lineHeight: '1.3',
+                                        textAlign: 'center',
+                                        boxShadow: '0 3px 10px rgba(0,0,0,0.2)'
+                                    }}>
+                                        {occupation}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     );
                 })}
