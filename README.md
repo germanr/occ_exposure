@@ -6,58 +6,53 @@ This interactive tool visualizes how different occupations may be impacted by AI
 
 ## Features
 
-- Select up to 6 preferred occupations from a list of 974 occupations
+- Select up to 6 preferred occupations from a searchable list of 674 occupations (6-digit SOC codes)
 - Visual tiered display showing AI exposure levels (red-yellow-green scale)
-- Top 3 most and least exposed occupations from your selections
-- Search functionality to explore additional occupations
+- Detailed information panel for each occupation, including:
+  - AI exposure level
+  - Three most similar occupations (by relatedness score) with their exposure levels
+  - Relevant areas of study: whether the majority of workers hold at least a bachelor's degree, and if so, the top 3 degree fields
+- Top 3 most and least exposed occupations across all occupations
+- Free-form search page to explore any occupation
 - Qualtrics integration for embedding in surveys
+
+## Data
+
+All data is loaded from a single CSV file (`public/aei_exposure_6digit.csv`) with the following key fields per occupation:
+
+| Field | Description |
+|-------|-------------|
+| `soc_code` | 6-digit SOC code |
+| `occupation` | Occupation name |
+| `ranking` | AI exposure ranking (1 = most exposed, 100 = least exposed) |
+| `educationcode` | Most common education level among workers |
+| `degfield_1`, `degfield_2`, `degfield_3` | Top 3 degree fields (when bachelor's or higher) |
+| `related_soc_code_1`, `related_soc_code_2`, `related_soc_code_3` | Three most related occupations by SOC code |
+
+Additional fields (e.g., `pct_tasks_automation`, `pct_tasks_augmentation`, `median_wage`, `total_employment`) are included in the CSV but not currently displayed.
 
 ## Technical Details
 
-The tool is built with React and uses:
+Built with React. Key implementation details:
 
-- React hooks for state management
-- Dynamic CSS-in-JS styling for responsive design
-- CSV data loading for occupation rankings
-- PostMessage API for Qualtrics integration
-
-## Data Sources
-
-Occupation AI exposure rankings are based on research data (occupations.csv).
-
-## Usage
-
-This tool is designed for:
-- Students making career decisions
-- Career counselors and academic advisors
-- Workforce development professionals
-- Researchers studying AI's impact on labor markets
+- Single CSV data source parsed on load with a custom quoted-field parser
+- SOC code lookup map for resolving related occupations
+- Education display logic: binary (bachelor's or higher vs. less than bachelor's), with degree fields shown only for bachelor's+
+- PostMessage API for Qualtrics integration (tracks time spent, occupations viewed, search terms)
 
 ## Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/germanjreyes/occ_exposure.git
-
-# Navigate to project directory
+git clone https://github.com/germanr/occ_exposure.git
 cd occ_exposure
-
-# Install dependencies
 npm install
-
-# Run the development server
 npm start
 ```
 
 ## Deployment
 
 ```bash
-# Build and deploy to GitHub Pages
 npm run deploy
 ```
 
-The app will be available at: https://germanjreyes.github.io/occ_exposure/
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+The app will be available at: https://germanr.github.io/occ_exposure/
