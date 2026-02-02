@@ -19,7 +19,7 @@ npm start
 import React, { useState, useEffect } from 'react';
 
 // CSV URL - update this when you change the GitHub location
-const CSV_URL = process.env.PUBLIC_URL + '/occupations.csv';
+const CSV_URL = process.env.PUBLIC_URL + '/aei_exposure_6digit.csv';
   
 /* Stores data for each occupation. The data is the two digit SOC code, the name of the occupation, 
    the 2024 median salary, the number of times a user has viewed the detailed information, 
@@ -87,32 +87,61 @@ function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedIte
 
     // Calculate dynamic padding based on max stack height
     const maxOccupationsInTier = Math.max(...Object.values(occupationsByTier).map(arr => arr.length), 1);
-    // Each occupation box is ~20px tall (with padding and gap)
-    const dynamicPaddingTop = Math.max(20, maxOccupationsInTier * 40);
+    // Each occupation box is ~40px tall (with padding and gap)
+    const dynamicPaddingBottom = Math.max(20, maxOccupationsInTier * 40);
 
     return (
         <div style={{ textAlign: 'center', marginBottom: '24px', width: '100%' }}>
             <div style={{
                 display: 'flex',
-                alignItems: 'flex-end',
+                alignItems: 'flex-start',
                 justifyContent: 'center',
                 gap: '16px',
                 marginBottom: '16px',
-                paddingTop: `${dynamicPaddingTop}px`,
-                minHeight: `${dynamicPaddingTop + 180}px`
+                paddingBottom: `${dynamicPaddingBottom}px`,
+                minHeight: `${dynamicPaddingBottom + 180}px`
             }}>
                 {tiers.map((tier, index) => {
                     const occupationsInTier = occupationsByTier[index] || [];
                     const hasOccupations = occupationsInTier.length > 0;
-                    const height = 160 - index * 20; // Descending heights
+                    const height = 160 - index * 20; // Descending heights (deeper for more exposed)
 
                     return (
                         <div key={tier.label} style={{ position: 'relative' }}>
-                            {/* Individual arrows for each occupation in this tier */}
+                            {/* The tier bar */}
+                            <div style={{
+                                width: '100px',
+                                height: `${height}px`,
+                                backgroundColor: hasOccupations ? tier.color : `${tier.color}15`,
+                                border: `3px solid ${tier.color}`,
+                                borderRadius: '0 0 12px 12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'background-color 0.3s'
+                            }}>
+                                <span style={{
+                                    fontSize: '14px',
+                                    fontWeight: '700',
+                                    color: hasOccupations ? '#fff' : tier.color,
+                                }}>
+                                    {tier.displayLabel}
+                                </span>
+                                <span style={{
+                                    fontSize: '11px',
+                                    fontWeight: '500',
+                                    color: hasOccupations ? 'rgba(255,255,255,0.8)' : tier.color,
+                                    marginTop: '2px'
+                                }}>
+                                    {tier.label}
+                                </span>
+                            </div>
+                            {/* Individual arrows for each occupation in this tier - BELOW the bar */}
                             {hasOccupations && (
                                 <div style={{
                                     position: 'absolute',
-                                    bottom: `${height + 12}px`,
+                                    top: `${height + 12}px`,
                                     left: '50%',
                                     transform: 'translateX(-50%)',
                                     display: 'flex',
@@ -136,6 +165,16 @@ function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedIte
                                                 onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
                                                 onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                                             >
+                                                {/* Arrow pointing up (only on first item) */}
+                                                {i === 0 && (
+                                                    <div style={{
+                                                        width: 0,
+                                                        height: 0,
+                                                        borderLeft: '8px solid transparent',
+                                                        borderRight: '8px solid transparent',
+                                                        borderBottom: `10px solid ${tier.color}`
+                                                    }} />
+                                                )}
                                                 {/* Individual occupation box */}
                                                 <div style={{
                                                     backgroundColor: tier.color,
@@ -154,50 +193,11 @@ function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedIte
                                                 }}>
                                                     {occ.name}
                                                 </div>
-                                                {/* Arrow pointing down (only on last item) */}
-                                                {i === occupationsInTier.length - 1 && (
-                                                    <div style={{
-                                                        width: 0,
-                                                        height: 0,
-                                                        borderLeft: '8px solid transparent',
-                                                        borderRight: '8px solid transparent',
-                                                        borderTop: `10px solid ${tier.color}`
-                                                    }} />
-                                                )}
                                             </div>
                                         );
                                     })}
                                 </div>
                             )}
-                            {/* The tier bar */}
-                            <div style={{
-                                width: '100px',
-                                height: `${height}px`,
-                                backgroundColor: hasOccupations ? tier.color : `${tier.color}15`,
-                                border: `3px solid ${tier.color}`,
-                                borderRadius: '12px 12px 0 0',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'background-color 0.3s'
-                            }}>
-                                <span style={{
-                                    fontSize: '14px',
-                                    fontWeight: '700',
-                                    color: hasOccupations ? '#fff' : tier.color,
-                                }}>
-                                    {tier.displayLabel}
-                                </span>
-                                <span style={{
-                                    fontSize: '11px',
-                                    fontWeight: '500',
-                                    color: hasOccupations ? 'rgba(255,255,255,0.8)' : tier.color,
-                                    marginTop: '2px'
-                                }}>
-                                    {tier.label}
-                                </span>
-                            </div>
                         </div>
                     );
                 })}
@@ -220,6 +220,7 @@ function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedIte
 }
 
 // Single occupation TieredSteps (for the fourth page)
+// INVERTED VERSION: Bars go DOWN, deeper = more exposed
 function SingleTieredSteps({ ranking, occupation }) {
     // 5 tiers with red-yellow-green color scale (no blue)
     const tiers = [
@@ -247,11 +248,11 @@ function SingleTieredSteps({ ranking, occupation }) {
 
             <div style={{
                 display: 'flex',
-                alignItems: 'flex-end',
+                alignItems: 'flex-start',
                 justifyContent: 'center',
                 gap: '12px',
                 marginBottom: '16px',
-                paddingTop: '80px'
+                paddingBottom: '80px'
             }}>
                 {tiers.map((tier, index) => {
                     const isActive = index === activeTier;
@@ -259,47 +260,13 @@ function SingleTieredSteps({ ranking, occupation }) {
 
                     return (
                         <div key={tier.label} style={{ position: 'relative' }}>
-                            {isActive && (
-                                <div style={{
-                                    position: 'absolute',
-                                    bottom: `${height + 12}px`,
-                                    left: '50%',
-                                    transform: 'translateX(-50%)',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: '0px'
-                                }}>
-                                    <div style={{
-                                        backgroundColor: tier.color,
-                                        color: '#fff',
-                                        padding: '8px 14px',
-                                        borderRadius: '8px',
-                                        fontSize: '12px',
-                                        fontWeight: '600',
-                                        whiteSpace: 'normal',
-                                        maxWidth: '160px',
-                                        lineHeight: '1.3',
-                                        textAlign: 'center',
-                                        boxShadow: '0 3px 10px rgba(0,0,0,0.2)'
-                                    }}>
-                                        {occupation}
-                                    </div>
-                                    <div style={{
-                                        width: 0,
-                                        height: 0,
-                                        borderLeft: '10px solid transparent',
-                                        borderRight: '10px solid transparent',
-                                        borderTop: `12px solid ${tier.color}`
-                                    }} />
-                                </div>
-                            )}
+                            {/* The tier bar */}
                             <div style={{
                                 width: '100px',
                                 height: `${height}px`,
                                 backgroundColor: isActive ? tier.color : `${tier.color}15`,
                                 border: `3px solid ${tier.color}`,
-                                borderRadius: '12px 12px 0 0',
+                                borderRadius: '0 0 12px 12px',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
@@ -322,6 +289,43 @@ function SingleTieredSteps({ ranking, occupation }) {
                                     {tier.label}
                                 </span>
                             </div>
+                            {/* Occupation label below the bar */}
+                            {isActive && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: `${height + 12}px`,
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '0px'
+                                }}>
+                                    {/* Arrow pointing up */}
+                                    <div style={{
+                                        width: 0,
+                                        height: 0,
+                                        borderLeft: '10px solid transparent',
+                                        borderRight: '10px solid transparent',
+                                        borderBottom: `12px solid ${tier.color}`
+                                    }} />
+                                    <div style={{
+                                        backgroundColor: tier.color,
+                                        color: '#fff',
+                                        padding: '8px 14px',
+                                        borderRadius: '8px',
+                                        fontSize: '12px',
+                                        fontWeight: '600',
+                                        whiteSpace: 'normal',
+                                        maxWidth: '160px',
+                                        lineHeight: '1.3',
+                                        textAlign: 'center',
+                                        boxShadow: '0 3px 10px rgba(0,0,0,0.2)'
+                                    }}>
+                                        {occupation}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     );
                 })}
@@ -360,6 +364,39 @@ function getButtonColor(ranking) {
     return '#bbf7d0'; // Lighter green for very low exposure
 }
 
+// Helper: format education code into display text and whether it's bachelor's+
+function formatEducation(educationcode) {
+    if (!educationcode) return { text: 'unknown', hasBachelors: false };
+    const lower = educationcode.toLowerCase().trim();
+    if (lower.includes('doctoral') || lower.includes('professional'))
+        return { text: 'a doctoral or professional degree', hasBachelors: true };
+    if (lower.includes('master'))
+        return { text: "a master's degree", hasBachelors: true };
+    if (lower.includes('bachelor'))
+        return { text: "a bachelor's degree", hasBachelors: true };
+    if (lower.includes('associate'))
+        return { text: "an associate's degree", hasBachelors: false };
+    if (lower.includes('postsecondary'))
+        return { text: 'a postsecondary nondegree award', hasBachelors: false };
+    if (lower.includes('some college'))
+        return { text: 'some college (no degree)', hasBachelors: false };
+    if (lower.includes('hs') || lower.includes('high school'))
+        return { text: 'a high school diploma or equivalent', hasBachelors: false };
+    if (lower.includes('no formal'))
+        return { text: 'no formal educational credential', hasBachelors: false };
+    return { text: educationcode, hasBachelors: false };
+}
+
+// Helper: capitalize degree field names (title case, lowercase small words)
+function capitalizeField(field) {
+    if (!field) return '';
+    const smallWords = new Set(['and', 'of', 'the', 'in', 'for', 'or', 'a', 'an']);
+    return field.split(' ').map((word, i) => {
+        if (i > 0 && smallWords.has(word.toLowerCase())) return word.toLowerCase();
+        return word.charAt(0).toUpperCase() + word.slice(1);
+    }).join(' ');
+}
+
 // Main function that creates the visualization
 function AIExposureVisualization() {
     // State for CSV data (ranking lookup and occupation list)
@@ -367,6 +404,7 @@ function AIExposureVisualization() {
     const [occupationList, setOccupationList] = useState([]);
     const [csvLoading, setCsvLoading] = useState(true);
     const [csvError, setCsvError] = useState(null);
+    const [socCodeMap, setSocCodeMap] = useState({});
 
     // Used to store the current user-inputted search term
     const [searchTerm, setSearchTerm] = useState('');
@@ -417,6 +455,14 @@ function AIExposureVisualization() {
 
                 const rankingIndex = headers.indexOf('ranking');
                 const occupationIndex = headers.indexOf('occupation');
+                const socCodeIndex = headers.indexOf('soc_code');
+                const educationcodeIndex = headers.indexOf('educationcode');
+                const degfield1Index = headers.indexOf('degfield_1');
+                const degfield2Index = headers.indexOf('degfield_2');
+                const degfield3Index = headers.indexOf('degfield_3');
+                const relatedSoc1Index = headers.indexOf('related_soc_code_1');
+                const relatedSoc2Index = headers.indexOf('related_soc_code_2');
+                const relatedSoc3Index = headers.indexOf('related_soc_code_3');
 
                 if (rankingIndex === -1 || occupationIndex === -1) {
                     throw new Error('CSV must have "ranking" and "occupation" columns');
@@ -424,6 +470,7 @@ function AIExposureVisualization() {
 
                 const data = {};
                 const occList = [];
+                const socMap = {};
                 for (let i = 1; i < lines.length; i++) {
                     // Handle CSV with quoted fields containing commas
                     const line = lines[i];
@@ -445,9 +492,32 @@ function AIExposureVisualization() {
 
                     const ranking = parseInt(values[rankingIndex], 10);
                     const occupation = values[occupationIndex]?.trim().replace(/^"|"$/g, '');
+                    const soc_code = socCodeIndex !== -1 ? (values[socCodeIndex]?.trim().replace(/^"|"$/g, '') || '') : '';
+                    const educationcode = educationcodeIndex !== -1 ? (values[educationcodeIndex]?.trim().replace(/^"|"$/g, '') || '') : '';
+                    const degfield_1 = degfield1Index !== -1 ? (values[degfield1Index]?.trim().replace(/^"|"$/g, '') || '') : '';
+                    const degfield_2 = degfield2Index !== -1 ? (values[degfield2Index]?.trim().replace(/^"|"$/g, '') || '') : '';
+                    const degfield_3 = degfield3Index !== -1 ? (values[degfield3Index]?.trim().replace(/^"|"$/g, '') || '') : '';
+                    const related_soc_code_1 = relatedSoc1Index !== -1 ? (values[relatedSoc1Index]?.trim().replace(/^"|"$/g, '') || '') : '';
+                    const related_soc_code_2 = relatedSoc2Index !== -1 ? (values[relatedSoc2Index]?.trim().replace(/^"|"$/g, '') || '') : '';
+                    const related_soc_code_3 = relatedSoc3Index !== -1 ? (values[relatedSoc3Index]?.trim().replace(/^"|"$/g, '') || '') : '';
+
                     if (occupation && !isNaN(ranking)) {
+                        const occObj = {
+                            id: i - 1,
+                            name: occupation,
+                            ranking: ranking,
+                            soc_code: soc_code,
+                            educationcode: educationcode,
+                            degfield_1: degfield_1,
+                            degfield_2: degfield_2,
+                            degfield_3: degfield_3,
+                            related_soc_code_1: related_soc_code_1,
+                            related_soc_code_2: related_soc_code_2,
+                            related_soc_code_3: related_soc_code_3,
+                        };
                         data[occupation.toLowerCase()] = ranking;
-                        occList.push({ id: i - 1, name: occupation, ranking: ranking });
+                        occList.push(occObj);
+                        if (soc_code) socMap[soc_code] = occObj;
                     }
                 }
 
@@ -456,6 +526,7 @@ function AIExposureVisualization() {
 
                 setRankingData(data);
                 setOccupationList(occList);
+                setSocCodeMap(socMap);
                 setCsvLoading(false);
             } catch (err) {
                 console.error('CSV fetch error:', err);
@@ -989,57 +1060,65 @@ function AIExposureVisualization() {
                                                         </strong> AI exposure.
                                                     </p>
 
-                                                    {selectedItem.occupation && selectedItem.occupation.length > 0 && (
-                                                        <>
-                                                            <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
-                                                                <strong>Similar occupations:</strong>
-                                                            </p>
-                                                            <ul style={{ paddingLeft: '20px', marginBottom: '15px', lineHeight: '1.8', color: 'black' }}>
-                                                                {selectedItem.occupation.map(occupation_number => {
-                                                                    const similarOcc = mockData.occupations[occupation_number];
-                                                                    const similarRanking = getRanking(similarOcc.name);
-                                                                    const similarExposure = getExposureLevel(similarRanking);
-                                                                    return (
-                                                                        <li key={similarOcc.name}>
-                                                                            <strong>{similarOcc.name}</strong>:{' '}
-                                                                            <span style={{ color: similarExposure.color, fontWeight: '600' }}>
-                                                                                {similarExposure.level}
-                                                                            </span> exposure (#{similarRanking})
-                                                                        </li>
-                                                                    );
-                                                                })}
-                                                            </ul>
-                                                        </>
-                                                    )}
+                                                    {(() => {
+                                                        const relatedOccs = [selectedItem.related_soc_code_1, selectedItem.related_soc_code_2, selectedItem.related_soc_code_3]
+                                                            .filter(Boolean)
+                                                            .map(code => socCodeMap[code])
+                                                            .filter(Boolean);
+                                                        return relatedOccs.length > 0 ? (
+                                                            <>
+                                                                <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
+                                                                    <strong>Occupations similar to {selectedItem.name} are shown below.</strong>
+                                                                </p>
+                                                                <ol style={{ paddingLeft: '20px', marginBottom: '15px', lineHeight: '1.8', color: 'black' }}>
+                                                                    {relatedOccs.map(occ => {
+                                                                        const similarExposure = getExposureLevel(occ.ranking);
+                                                                        return (
+                                                                            <li key={occ.soc_code}>
+                                                                                <strong>{occ.name}</strong>:{' '}
+                                                                                <span style={{ color: similarExposure.color, fontWeight: '600' }}>
+                                                                                    {similarExposure.level}
+                                                                                </span> exposure (#{occ.ranking})
+                                                                            </li>
+                                                                        );
+                                                                    })}
+                                                                </ol>
+                                                            </>
+                                                        ) : null;
+                                                    })()}
 
-                                                    <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
-                                                        <strong>Relevant areas of study:</strong>
-                                                    </p>
-                                                    <ul style={{ paddingLeft: '20px', marginBottom: '10px', lineHeight: '1.8', color: 'black' }}>
-                                                        <li>
-                                                            <strong>{selectedItem.name}</strong>:
-                                                            {selectedItem.two_digit_soc_code <= 27 ?
-                                                                ' Most workers hold at least a bachelor\'s degree.' :
-                                                                selectedItem.two_digit_soc_code >= 31 ?
-                                                                    ' Most workers have less than a bachelor\'s degree.' :
-                                                                    ' A bachelor\'s degree is common but not required.'}
-                                                            {' '}Typical fields: <strong>{listFormatter.format(selectedItem.major)}</strong>.
-                                                        </li>
-                                                        {selectedItem.occupation && selectedItem.occupation.map(occupation_number => {
-                                                            const relatedOcc = mockData.occupations[occupation_number];
-                                                            return (
-                                                                <li key={relatedOcc.name}>
-                                                                    <strong>{relatedOcc.name}</strong>:
-                                                                    {relatedOcc.two_digit_soc_code <= 27 ?
-                                                                        ' Most workers hold at least a bachelor\'s degree.' :
-                                                                        relatedOcc.two_digit_soc_code >= 31 ?
-                                                                            ' Most workers have less than a bachelor\'s degree.' :
-                                                                            ' A bachelor\'s degree is common but not required.'}
-                                                                    {' '}Typical fields: <strong>{listFormatter.format(relatedOcc.major)}</strong>.
-                                                                </li>
-                                                            );
-                                                        })}
-                                                    </ul>
+                                                    {(() => {
+                                                        const relatedOccs = [selectedItem.related_soc_code_1, selectedItem.related_soc_code_2, selectedItem.related_soc_code_3]
+                                                            .filter(Boolean)
+                                                            .map(code => socCodeMap[code])
+                                                            .filter(Boolean);
+                                                        const allOccs = [selectedItem, ...relatedOccs];
+                                                        return (
+                                                            <>
+                                                                <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
+                                                                    <strong>Relevant areas of study</strong>
+                                                                </p>
+                                                                <ul style={{ paddingLeft: '20px', marginBottom: '10px', lineHeight: '1.8', color: 'black' }}>
+                                                                    {allOccs.map(occ => {
+                                                                        const edu = formatEducation(occ.educationcode);
+                                                                        const degFields = [occ.degfield_1, occ.degfield_2, occ.degfield_3]
+                                                                            .filter(Boolean)
+                                                                            .map(capitalizeField);
+                                                                        return (
+                                                                            <li key={occ.soc_code || occ.name}>
+                                                                                {occ.name}: {edu.hasBachelors
+                                                                                    ? 'The majority of workers in this occupation hold at least a college (bachelor\'s) degree.'
+                                                                                    : 'The majority of workers in this occupation have less than a college (bachelor\'s) degree.'}
+                                                                                {edu.hasBachelors && degFields.length > 0 && (
+                                                                                    <> Workers typically study <strong>{listFormatter.format(degFields)}</strong>.</>
+                                                                                )}
+                                                                            </li>
+                                                                        );
+                                                                    })}
+                                                                </ul>
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </div>
                                             )}
                                         </div>
@@ -1189,57 +1268,65 @@ function AIExposureVisualization() {
                                                 <strong style={{ color: exposure.color }}>{exposure.level}</strong> AI exposure.
                                             </p>
 
-                                            {selectedItem.occupation && selectedItem.occupation.length > 0 && (
-                                                <>
-                                                    <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
-                                                        <strong>Similar occupations:</strong>
-                                                    </p>
-                                                    <ul style={{ paddingLeft: '20px', marginBottom: '15px', lineHeight: '1.8', color: 'black' }}>
-                                                        {selectedItem.occupation.map(occupation_number => {
-                                                            const similarOcc = mockData.occupations[occupation_number];
-                                                            const similarRanking = getRanking(similarOcc.name);
-                                                            const similarExposure = getExposureLevel(similarRanking);
-                                                            return (
-                                                                <li key={similarOcc.name}>
-                                                                    <strong>{similarOcc.name}</strong>:{' '}
-                                                                    <span style={{ color: similarExposure.color, fontWeight: '600' }}>
-                                                                        {similarExposure.level}
-                                                                    </span> exposure (#{similarRanking})
-                                                                </li>
-                                                            );
-                                                        })}
-                                                    </ul>
-                                                </>
-                                            )}
+                                            {(() => {
+                                                const relatedOccs = [selectedItem.related_soc_code_1, selectedItem.related_soc_code_2, selectedItem.related_soc_code_3]
+                                                    .filter(Boolean)
+                                                    .map(code => socCodeMap[code])
+                                                    .filter(Boolean);
+                                                return relatedOccs.length > 0 ? (
+                                                    <>
+                                                        <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
+                                                            <strong>Occupations similar to {selectedItem.name} are shown below.</strong>
+                                                        </p>
+                                                        <ol style={{ paddingLeft: '20px', marginBottom: '15px', lineHeight: '1.8', color: 'black' }}>
+                                                            {relatedOccs.map(occ => {
+                                                                const similarExposure = getExposureLevel(occ.ranking);
+                                                                return (
+                                                                    <li key={occ.soc_code}>
+                                                                        <strong>{occ.name}</strong>:{' '}
+                                                                        <span style={{ color: similarExposure.color, fontWeight: '600' }}>
+                                                                            {similarExposure.level}
+                                                                        </span> exposure (#{occ.ranking})
+                                                                    </li>
+                                                                );
+                                                            })}
+                                                        </ol>
+                                                    </>
+                                                ) : null;
+                                            })()}
 
-                                            <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
-                                                <strong>Relevant areas of study:</strong>
-                                            </p>
-                                            <ul style={{ paddingLeft: '20px', marginBottom: '10px', lineHeight: '1.8', color: 'black' }}>
-                                                <li>
-                                                    <strong>{selectedItem.name}</strong>:
-                                                    {selectedItem.two_digit_soc_code <= 27 ?
-                                                        ' Most workers hold at least a bachelor\'s degree.' :
-                                                        selectedItem.two_digit_soc_code >= 31 ?
-                                                            ' Most workers have less than a bachelor\'s degree.' :
-                                                            ' A bachelor\'s degree is common but not required.'}
-                                                    {' '}Typical fields: <strong>{listFormatter.format(selectedItem.major)}</strong>.
-                                                </li>
-                                                {selectedItem.occupation && selectedItem.occupation.map(occupation_number => {
-                                                    const relatedOcc = mockData.occupations[occupation_number];
-                                                    return (
-                                                        <li key={relatedOcc.name}>
-                                                            <strong>{relatedOcc.name}</strong>:
-                                                            {relatedOcc.two_digit_soc_code <= 27 ?
-                                                                ' Most workers hold at least a bachelor\'s degree.' :
-                                                                relatedOcc.two_digit_soc_code >= 31 ?
-                                                                    ' Most workers have less than a bachelor\'s degree.' :
-                                                                    ' A bachelor\'s degree is common but not required.'}
-                                                            {' '}Typical fields: <strong>{listFormatter.format(relatedOcc.major)}</strong>.
-                                                        </li>
-                                                    );
-                                                })}
-                                            </ul>
+                                            {(() => {
+                                                const relatedOccs = [selectedItem.related_soc_code_1, selectedItem.related_soc_code_2, selectedItem.related_soc_code_3]
+                                                    .filter(Boolean)
+                                                    .map(code => socCodeMap[code])
+                                                    .filter(Boolean);
+                                                const allOccs = [selectedItem, ...relatedOccs];
+                                                return (
+                                                    <>
+                                                        <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
+                                                            <strong>Relevant areas of study</strong>
+                                                        </p>
+                                                        <ul style={{ paddingLeft: '20px', marginBottom: '10px', lineHeight: '1.8', color: 'black' }}>
+                                                            {allOccs.map(occ => {
+                                                                const edu = formatEducation(occ.educationcode);
+                                                                const degFields = [occ.degfield_1, occ.degfield_2, occ.degfield_3]
+                                                                    .filter(Boolean)
+                                                                    .map(capitalizeField);
+                                                                return (
+                                                                    <li key={occ.soc_code || occ.name}>
+                                                                        {occ.name}: {edu.hasBachelors
+                                                                                    ? 'The majority of workers in this occupation hold at least a college (bachelor\'s) degree.'
+                                                                                    : 'The majority of workers in this occupation have less than a college (bachelor\'s) degree.'}
+                                                                        {edu.hasBachelors && degFields.length > 0 && (
+                                                                            <> Workers typically study <strong>{listFormatter.format(degFields)}</strong>.</>
+                                                                        )}
+                                                                    </li>
+                                                                );
+                                                            })}
+                                                        </ul>
+                                                    </>
+                                                );
+                                            })()}
                                         </>
                                     );
                                 })()}
