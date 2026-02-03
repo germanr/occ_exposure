@@ -18,7 +18,7 @@ npm start
 
 import React, { useState, useEffect } from 'react';
 
-// CSV URL - update this when you change the GitHub location
+// CSV URL
 const CSV_URL = process.env.PUBLIC_URL + '/aei_exposure_6digit.csv';
   
 /* Stores data for each occupation. The data is the two digit SOC code, the name of the occupation, 
@@ -758,7 +758,7 @@ function AIExposureVisualization() {
                 padding: '20px',
                 textAlign: 'center'
             }}>
-                <p>Loading occupation data...</p>
+                <p>Loading occupation data</p>
             </div>
         );
     }
