@@ -48,7 +48,7 @@ const QUINTILE_META = {
     5: {
         title: 'Very High',
         textLabel: 'very high',
-        explanation: 'These occupations include many tasks AI can perform or assist with, so AI use is frequent and can substantially reshape day-to-day work.',
+        explanation: '',
     },
 };
 
@@ -69,6 +69,13 @@ function formatSignedPercent(value, digits = 1) {
 function formatAbsPercent(value, digits = 1) {
     if (!Number.isFinite(value)) return 'N/A';
     return `${Math.abs(value).toFixed(digits)}%`;
+}
+
+function formatAxisPercent(value) {
+    if (!Number.isFinite(value)) return 'N/A';
+    const rounded = Math.abs(value - Math.round(value)) < 1e-8 ? Math.round(value) : Number(value.toFixed(1));
+    const sign = rounded > 0 ? '+' : '';
+    return `${sign}${rounded}%`;
 }
 
 function getEmploymentColor(value) {
@@ -326,7 +333,15 @@ function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedIte
     );
 }
 
-function EmploymentChangeChart({ occupationName, ranking, employmentChangeByQuintile, showExposureGuide = true }) {
+function EmploymentChangeChart({
+    occupationName,
+    ranking,
+    employmentChangeByQuintile,
+    showExposureGuide = true,
+    annotations = [],
+    selectedOccupationName = null,
+    occupationDescriptor = 'top-choice',
+}) {
     if (!employmentChangeByQuintile) {
         return (
             <div style={{
@@ -346,11 +361,71 @@ function EmploymentChangeChart({ occupationName, ranking, employmentChangeByQuin
     const participantMeta = QUINTILE_META[participantQuintile];
     const participantValue = employmentChangeByQuintile[participantQuintile];
 
+    const normalizeAnnotation = (entry) => {
+        const name = (entry?.name || '').trim();
+        const rank = Number(entry?.ranking);
+        if (!name || !Number.isFinite(rank)) return null;
+        return {
+            name,
+            ranking: rank,
+            quintile: getExposureQuintile(rank),
+        };
+    };
+
+    const wrapMarkerText = (text, maxCharsPerLine = 24) => {
+        if (!text) return [''];
+        const words = text.split(/\s+/).filter(Boolean);
+        const lines = [];
+        let currentLine = '';
+
+        words.forEach((word) => {
+            if (word.length > maxCharsPerLine) {
+                if (currentLine) {
+                    lines.push(currentLine);
+                    currentLine = '';
+                }
+                for (let i = 0; i < word.length; i += maxCharsPerLine) {
+                    lines.push(word.slice(i, i + maxCharsPerLine));
+                }
+                return;
+            }
+
+            if (!currentLine) {
+                currentLine = word;
+                return;
+            }
+
+            const candidate = `${currentLine} ${word}`;
+            if (candidate.length <= maxCharsPerLine) {
+                currentLine = candidate;
+            } else {
+                lines.push(currentLine);
+                currentLine = word;
+            }
+        });
+
+        if (currentLine) lines.push(currentLine);
+        return lines.length ? lines : [''];
+    };
+
     const chartData = QUINTILE_ORDER.map((q) => ({
         quintile: q,
-        label: QUINTILE_META[q].title,
+        labelTop: QUINTILE_META[q].title,
+        labelBottom: 'AI Exposure',
         value: employmentChangeByQuintile[q],
     })).filter((d) => Number.isFinite(d.value));
+
+    const markerAnnotations = annotations
+        .map(normalizeAnnotation)
+        .filter(Boolean);
+
+    if (markerAnnotations.length === 0 && occupationName && Number.isFinite(ranking)) {
+        markerAnnotations.push({
+            name: occupationName,
+            ranking: Number(ranking),
+            quintile: participantQuintile,
+        });
+    }
 
     if (!chartData.length || !Number.isFinite(participantValue)) {
         return (
@@ -370,10 +445,32 @@ function EmploymentChangeChart({ occupationName, ranking, employmentChangeByQuin
     const values = chartData.map((d) => d.value);
     const minValue = Math.min(...values, 0);
     const maxValue = Math.max(...values, 0);
-    const rawRange = maxValue - minValue;
-    const padding = Math.max(1, rawRange * 0.15);
-    const yMin = minValue - padding;
-    const yMax = maxValue + padding;
+
+    // Build a rounded y-axis scale with "nice" tick intervals (1/2/5 * 10^n).
+    const niceStep = (rawStep) => {
+        if (!Number.isFinite(rawStep) || rawStep <= 0) return 1;
+        const exponent = Math.floor(Math.log10(rawStep));
+        const magnitude = 10 ** exponent;
+        const normalized = rawStep / magnitude;
+        let niceNormalized = 10;
+        if (normalized <= 1) niceNormalized = 1;
+        else if (normalized <= 2) niceNormalized = 2;
+        else if (normalized <= 5) niceNormalized = 5;
+        return niceNormalized * magnitude;
+    };
+
+    const targetTickCount = 6;
+    const rawRange = Math.max(1, maxValue - minValue);
+    const tickStep = niceStep(rawRange / (targetTickCount - 1));
+
+    let yMin = Math.floor(minValue / tickStep) * tickStep;
+    let yMax = Math.ceil(maxValue / tickStep) * tickStep;
+    if (yMin > 0) yMin = 0;
+    if (yMax < 0) yMax = 0;
+    if (Math.abs(yMax - yMin) < 1e-8) {
+        yMin -= tickStep;
+        yMax += tickStep;
+    }
 
     const chartLeft = 64;
     const chartTop = 24;
@@ -381,13 +478,127 @@ function EmploymentChangeChart({ occupationName, ranking, employmentChangeByQuin
     const chartHeight = 240;
     const slotWidth = chartWidth / chartData.length;
     const barWidth = Math.min(78, slotWidth * 0.58);
+    const xAxisLabelY = chartTop + chartHeight + 20;
+    const xAxisLabelBottomY = xAxisLabelY + 13;
+
+    const markersByQuintile = {};
+    chartData.forEach((d) => {
+        markersByQuintile[d.quintile] = [];
+    });
+    markerAnnotations.forEach((marker) => {
+        if (markersByQuintile[marker.quintile]) {
+            markersByQuintile[marker.quintile].push(marker);
+        }
+    });
+
+    const markerStartY = xAxisLabelBottomY + 12;
+    const markerGapY = 8;
+    const markerCollisionX = 0;
+    const markerCollisionY = 8;
+    const markerLayoutsByQuintile = {};
+    const nextTipYByQuintile = {};
+    const quintileCenters = {};
+    const quintileColumnBounds = {};
+    const placedBoxes = [];
+    let maxMarkerBottomY = 340;
+
+    chartData.forEach((d, idx) => {
+        markerLayoutsByQuintile[d.quintile] = [];
+        nextTipYByQuintile[d.quintile] = markerStartY;
+        quintileCenters[d.quintile] = chartLeft + idx * slotWidth + (slotWidth / 2);
+        const columnLeft = chartLeft + idx * slotWidth;
+        const innerPadding = 6;
+        quintileColumnBounds[d.quintile] = {
+            left: columnLeft + innerPadding,
+            right: columnLeft + slotWidth - innerPadding,
+            width: Math.max(80, slotWidth - (innerPadding * 2)),
+        };
+    });
+
+    const hasCollision = (candidate) => {
+        return placedBoxes.some((placed) =>
+            candidate.left < placed.right + markerCollisionX &&
+            candidate.right > placed.left - markerCollisionX &&
+            candidate.top < placed.bottom + markerCollisionY &&
+            candidate.bottom > placed.top - markerCollisionY
+        );
+    };
+
+    chartData.forEach((d) => {
+        const markers = markersByQuintile[d.quintile] || [];
+        const column = quintileColumnBounds[d.quintile];
+
+        markers.forEach((marker) => {
+            const boxWidth = Math.floor(column.width);
+            const maxCharsPerLine = Math.max(12, Math.floor((boxWidth - 24) / 6.2));
+            const lines = wrapMarkerText(marker.name, maxCharsPerLine);
+            const lineHeight = 13;
+            const textBlockHeight = lines.length * lineHeight;
+            const boxHeight = Math.max(30, textBlockHeight + 12);
+            const boxX = column.left + ((column.width - boxWidth) / 2);
+
+            let tipY = nextTipYByQuintile[d.quintile];
+            let attempts = 0;
+            let boxY = tipY + 8;
+            let candidate = {
+                left: boxX,
+                right: boxX + boxWidth,
+                top: boxY,
+                bottom: boxY + boxHeight,
+            };
+
+            while (hasCollision(candidate) && attempts < 200) {
+                tipY = candidate.bottom + markerGapY;
+                boxY = tipY + 8;
+                candidate = {
+                    left: boxX,
+                    right: boxX + boxWidth,
+                    top: boxY,
+                    bottom: boxY + boxHeight,
+                };
+                attempts += 1;
+            }
+
+            const previousLayouts = markerLayoutsByQuintile[d.quintile];
+            const connectorStartY = previousLayouts.length > 0
+                ? (previousLayouts[previousLayouts.length - 1].boxY + previousLayouts[previousLayouts.length - 1].boxHeight + 4)
+                : (xAxisLabelBottomY + 6);
+
+            const layout = {
+                marker,
+                lines,
+                lineHeight,
+                boxWidth,
+                boxHeight,
+                tipY,
+                boxY,
+                boxX,
+                connectorStartY,
+            };
+
+            markerLayoutsByQuintile[d.quintile].push(layout);
+            nextTipYByQuintile[d.quintile] = candidate.bottom + markerGapY;
+            placedBoxes.push(candidate);
+            maxMarkerBottomY = Math.max(maxMarkerBottomY, candidate.bottom);
+        });
+    });
+
+    const svgHeight = maxMarkerBottomY + 18;
+    const selectedMarkerName = selectedOccupationName || occupationName;
 
     const yScale = (v) => chartTop + ((yMax - v) / (yMax - yMin)) * chartHeight;
     const zeroY = yScale(0);
-    const tickValues = [yMax, 0, yMin]
-        .filter((v, i, arr) => arr.findIndex((x) => Math.abs(x - v) < 0.0001) === i);
+    const tickValues = [];
+    for (let tick = yMax; tick >= yMin - (tickStep * 0.5); tick -= tickStep) {
+        tickValues.push(Number(tick.toFixed(10)));
+    }
+    if (!tickValues.some((v) => Math.abs(v) < 1e-8)) {
+        tickValues.push(0);
+        tickValues.sort((a, b) => b - a);
+    }
 
     const direction = participantValue >= 0 ? 'growth' : 'decline';
+    const participantBarColor = getEmploymentColor(participantValue);
     const participantWorkers = Math.round(Math.abs(participantValue));
     const plainLanguageText = participantValue >= 0
         ? `What does this mean? For your group, the change is ${formatSignedPercent(participantValue)}. That means roughly ${participantWorkers} jobs were added for every 100 workers.`
@@ -401,7 +612,12 @@ function EmploymentChangeChart({ occupationName, ranking, employmentChangeByQuin
             borderRadius: '6px',
             border: '1px solid #e2e8f0',
         }}>
-            <svg viewBox="0 0 760 340" style={{ width: '100%', height: 'auto' }}>
+            <ul style={{ marginTop: '8px', marginBottom: '10px', paddingLeft: '20px', lineHeight: '1.5', color: '#334155' }}>
+                <li>The chart shows how employment for young workers has changed since the release of ChatGPT.</li>
+                <li>The arrows with occupation names point to each relevant AI exposure group.</li>
+            </ul>
+
+            <svg viewBox={`0 0 760 ${svgHeight}`} style={{ width: '100%', height: 'auto' }}>
                 {tickValues.map((tick) => {
                     const y = yScale(tick);
                     return (
@@ -421,7 +637,7 @@ function EmploymentChangeChart({ occupationName, ranking, employmentChangeByQuin
                                 fill="#64748b"
                                 fontSize="12"
                             >
-                                {formatSignedPercent(tick)}
+                                {formatAxisPercent(tick)}
                             </text>
                         </g>
                     );
@@ -440,13 +656,12 @@ function EmploymentChangeChart({ occupationName, ranking, employmentChangeByQuin
                     const x = chartLeft + idx * slotWidth + (slotWidth - barWidth) / 2;
                     const y = d.value >= 0 ? yScale(d.value) : zeroY;
                     const height = Math.max(2, Math.abs(yScale(d.value) - zeroY));
-                    const isParticipant = d.quintile === participantQuintile;
-                    const fill = isParticipant ? '#f59e0b' : getEmploymentColor(d.value);
-                    const stroke = isParticipant ? '#7c2d12' : '#33415522';
+                    const fill = getEmploymentColor(d.value);
+                    const stroke = '#33415522';
                     const valueLabelY = d.value >= 0 ? y - 8 : y + height + 16;
 
                     return (
-                        <g key={d.label}>
+                        <g key={`${d.labelTop}-${d.labelBottom}`}>
                             <rect
                                 x={x}
                                 y={y}
@@ -454,7 +669,7 @@ function EmploymentChangeChart({ occupationName, ranking, employmentChangeByQuin
                                 height={height}
                                 fill={fill}
                                 stroke={stroke}
-                                strokeWidth={isParticipant ? 2.5 : 1}
+                                strokeWidth={1}
                                 rx={4}
                             />
                             <text
@@ -469,21 +684,88 @@ function EmploymentChangeChart({ occupationName, ranking, employmentChangeByQuin
                             </text>
                             <text
                                 x={x + barWidth / 2}
-                                y={chartTop + chartHeight + 24}
+                                y={xAxisLabelY}
                                 textAnchor="middle"
                                 fill="#334155"
-                                fontSize="12"
+                                fontSize="11"
                                 fontWeight="600"
                             >
-                                {d.label}
+                                <tspan x={x + barWidth / 2} y={xAxisLabelY}>
+                                    {d.labelTop}
+                                </tspan>
+                                <tspan x={x + barWidth / 2} y={xAxisLabelBottomY}>
+                                    {d.labelBottom}
+                                </tspan>
                             </text>
                         </g>
                     );
                 })}
 
+                {chartData.map((d, idx) => {
+                    const xCenter = chartLeft + idx * slotWidth + (slotWidth / 2);
+                    const layouts = markerLayoutsByQuintile[d.quintile] || [];
+
+                    return layouts.map((layout, markerIdx) => {
+                        const { marker, lines, lineHeight, boxWidth, boxHeight, tipY, boxY, boxX, connectorStartY } = layout;
+                        const isSelectedMarker = marker.name === selectedMarkerName;
+                        const markerTextColor = '#1f3552';
+                        const markerBorderColor = '#b4c1d2';
+                        const markerArrowColor = '#7a8da6';
+                        const markerStemColor = '#94a3b8';
+                        const textStartY = boxY + ((boxHeight - (lines.length * lineHeight)) / 2) + 10;
+
+                        return (
+                            <g key={`marker-${d.quintile}-${marker.name}-${markerIdx}`}>
+                                <line
+                                    x1={xCenter}
+                                    y1={connectorStartY}
+                                    x2={xCenter}
+                                    y2={tipY}
+                                    stroke={markerStemColor}
+                                    strokeWidth={1}
+                                />
+                                <polygon
+                                    points={`${xCenter},${tipY} ${xCenter - 6},${tipY + 8} ${xCenter + 6},${tipY + 8}`}
+                                    fill={markerArrowColor}
+                                />
+                                <rect
+                                    x={boxX}
+                                    y={boxY}
+                                    width={boxWidth}
+                                    height={boxHeight}
+                                    rx={5}
+                                    fill="#ffffff"
+                                    stroke={markerBorderColor}
+                                    strokeWidth={isSelectedMarker ? 2 : 1}
+                                />
+                                <text
+                                    x={boxX + boxWidth / 2}
+                                    y={textStartY}
+                                    textAnchor="middle"
+                                    fill={markerTextColor}
+                                    fontSize="11"
+                                    fontWeight={isSelectedMarker ? '700' : '600'}
+                                >
+                                    {lines.map((line, lineIdx) => (
+                                        <tspan
+                                            key={`marker-line-${lineIdx}`}
+                                            x={boxX + boxWidth / 2}
+                                            y={textStartY + (lineIdx * lineHeight)}
+                                        >
+                                            {line}
+                                        </tspan>
+                                    ))}
+                                </text>
+                            </g>
+                        );
+                    });
+                })}
+
                 <text
                     x={18}
-                    y={chartTop - 4}
+                    y={chartTop + (chartHeight / 2)}
+                    transform={`rotate(-90 18 ${chartTop + (chartHeight / 2)})`}
+                    textAnchor="middle"
                     fill="#334155"
                     fontSize="12"
                     fontWeight="600"
@@ -492,15 +774,23 @@ function EmploymentChangeChart({ occupationName, ranking, employmentChangeByQuin
                 </text>
             </svg>
 
-            <p style={{ marginTop: '8px', marginBottom: '10px', lineHeight: '1.5', color: '#334155' }}>
-                The chart below shows how employment for young workers has changed since the release of ChatGPT in November 2022, grouped by AI exposure. Your group is the orange bar highlighted by the dark border.
-            </p>
-
-            <p style={{ marginBottom: '10px', lineHeight: '1.5', color: '#334155' }}>
-                Workers in <strong>{occupationName}</strong> have been grouped in the{' '}
-                <strong>{participantMeta.textLabel}</strong> AI exposure category. This group has historically experienced{' '}
-                <strong>{formatAbsPercent(participantValue)} {direction}</strong> in employment since the release of ChatGPT.
-            </p>
+            <div style={{ marginBottom: '10px', lineHeight: '1.5', color: '#334155' }}>
+                <p style={{ margin: 0 }}>
+                    Your {occupationDescriptor} occupation was <strong>{occupationName}</strong>.
+                </p>
+                <ul style={{ margin: '6px 0 0 0', paddingLeft: '20px' }}>
+                    <li>
+                        Workers in this occupation are in the{' '}
+                        <strong style={{ color: participantBarColor }}>{participantMeta.textLabel}</strong>{' '}
+                        AI exposure category.
+                    </li>
+                    <li>
+                        Group with this AI exposure has historically experienced{' '}
+                        <strong style={{ color: participantBarColor }}>{formatAbsPercent(participantValue)}</strong>{' '}
+                        {direction} in employment since the release of ChatGPT in November 2022.
+                    </li>
+                </ul>
+            </div>
 
             <div style={{
                 marginBottom: '10px',
@@ -523,13 +813,13 @@ function EmploymentChangeChart({ occupationName, ranking, employmentChangeByQuin
                     borderRadius: '6px',
                 }}>
                     <p style={{ marginTop: 0, marginBottom: '8px', fontWeight: '600', color: '#334155' }}>
-                        How to interpret exposure groups
+                        How to read the exposure groups
                     </p>
-                    {QUINTILE_ORDER.slice().reverse().map((q) => (
-                        <p key={`exposure-guide-${q}`} style={{ margin: '4px 0', lineHeight: '1.5', color: '#334155' }}>
-                            <strong>{QUINTILE_META[q].title} exposure:</strong> {QUINTILE_META[q].explanation}
-                        </p>
-                    ))}
+                    <ul style={{ margin: '4px 0 0 0', paddingLeft: '20px', lineHeight: '1.5', color: '#334155' }}>
+                        <li>Jobs range from Very High to Very Low exposure.</li>
+                        <li>More exposure means more tasks in that job can be done or helped by AI.</li>
+                        <li>Less exposure means fewer tasks can currently be done by AI.</li>
+                    </ul>
                 </div>
             )}
         </div>
@@ -904,9 +1194,8 @@ function AIExposureVisualization() {
 
     // Handles user clicking the submit button at the beginning of the visualization
     const handleSubmit = () => {
-        // Sort by ranking (most exposed first = lowest ranking number)
-        const sortedList = [...list].sort((a, b) => getRanking(a.name) - getRanking(b.name));
-        setRanked(sortedList);
+        // Preserve user-entered preferred occupation order from the first screen
+        setRanked([...list]);
         setShowSearch(false);
         updateTimeSpentPages(0, timeSpent);
         setTimeSpent(0);
@@ -930,8 +1219,8 @@ function AIExposureVisualization() {
     const handleBack = (page_num, show_top, submit) => {
         setShowTop(show_top);
         if (submit) {
-            const sortedList = [...list].sort((a, b) => getRanking(a.name) - getRanking(b.name));
-            setRanked(sortedList);
+            // Preserve user-entered preferred occupation order from the first screen
+            setRanked([...list]);
             setShowSearch(false);
         }
         if (selectedItem) {
@@ -1172,6 +1461,10 @@ function AIExposureVisualization() {
             {ranked && (() => {
                 const chartOccupation = selectedItem || ranked[0];
                 const chartRanking = chartOccupation ? getRanking(chartOccupation.name) : null;
+                const chartAnnotations = ranked.map((item) => ({
+                    name: item.name,
+                    ranking: getRanking(item.name),
+                }));
 
                 return (
                     <>
@@ -1194,15 +1487,15 @@ function AIExposureVisualization() {
                                 }}>
                                     Here are the occupations you selected and their AI exposure categories.
                                 </p>
-                                <p style={{ textAlign: 'center', marginBottom: '20px', color: '#666', fontSize: '14px' }}>
-                                    The chart uses the currently selected occupation. Click an occupation below to update the highlighted group.
-                                </p>
 
                                 {chartOccupation && Number.isFinite(chartRanking) && (
                                     <EmploymentChangeChart
                                         occupationName={chartOccupation.name}
                                         ranking={chartRanking}
                                         employmentChangeByQuintile={employmentChangeByQuintile}
+                                        annotations={chartAnnotations}
+                                        selectedOccupationName={chartOccupation.name}
+                                        occupationDescriptor="top-choice"
                                         showExposureGuide={true}
                                     />
                                 )}
@@ -1672,6 +1965,9 @@ function AIExposureVisualization() {
                                     occupationName={selectedItemEnd.name}
                                     ranking={ranking}
                                     employmentChangeByQuintile={employmentChangeByQuintile}
+                                    annotations={[{ name: selectedItemEnd.name, ranking }]}
+                                    selectedOccupationName={selectedItemEnd.name}
+                                    occupationDescriptor="selected"
                                     showExposureGuide={false}
                                 />
                                 <div style={{
@@ -1688,9 +1984,11 @@ function AIExposureVisualization() {
                                         Workers in <strong>{selectedItemEnd.name}</strong> have{' '}
                                         <strong style={{ color: getEmploymentColor(selectedChange) }}>{selectedMeta.textLabel}</strong> AI exposure.
                                     </p>
-                                    <p style={{ marginBottom: 0, lineHeight: '1.5', color: '#334155' }}>
-                                        {selectedMeta.explanation}
-                                    </p>
+                                    {selectedMeta.explanation && (
+                                        <p style={{ marginBottom: 0, lineHeight: '1.5', color: '#334155' }}>
+                                            {selectedMeta.explanation}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         );
