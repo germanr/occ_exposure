@@ -20,6 +20,113 @@ import React, { useState, useEffect } from 'react';
 
 // CSV URL
 const CSV_URL = process.env.PUBLIC_URL + '/aei_exposure_6digit.csv';
+const EMPLOYMENT_DATA_URL = process.env.PUBLIC_URL + '/headcount_data.json';
+const CHATGPT_RELEASE_DATE = '2022-11-01';
+const QUINTILE_ORDER = [1, 2, 3, 4, 5]; // 1 = least exposed, 5 = most exposed
+
+const QUINTILE_META = {
+    1: {
+        title: 'Very Low',
+        textLabel: 'very low',
+        explanation: 'These occupations rely on tasks AI currently struggles with, especially physical, hands-on, or highly context-specific work.',
+    },
+    2: {
+        title: 'Low',
+        textLabel: 'low',
+        explanation: 'These occupations have some exposure to AI tools, but most core tasks still depend on human judgment or manual execution.',
+    },
+    3: {
+        title: 'Moderate',
+        textLabel: 'moderate',
+        explanation: 'These occupations combine tasks AI can support with tasks where workers still need to verify, adapt, and make final decisions.',
+    },
+    4: {
+        title: 'High',
+        textLabel: 'high',
+        explanation: 'Workers in these occupations often use AI for writing, analysis, and decision support. This reflects task exposure and augmentation, not automatic replacement.',
+    },
+    5: {
+        title: 'Very High',
+        textLabel: 'very high',
+        explanation: 'These occupations include many tasks AI can perform or assist with, so AI use is frequent and can substantially reshape day-to-day work.',
+    },
+};
+
+function getExposureQuintile(ranking) {
+    if (ranking <= 20) return 5;
+    if (ranking <= 40) return 4;
+    if (ranking <= 60) return 3;
+    if (ranking <= 80) return 2;
+    return 1;
+}
+
+function formatSignedPercent(value, digits = 1) {
+    if (!Number.isFinite(value)) return 'N/A';
+    const sign = value > 0 ? '+' : '';
+    return `${sign}${value.toFixed(digits)}%`;
+}
+
+function formatAbsPercent(value, digits = 1) {
+    if (!Number.isFinite(value)) return 'N/A';
+    return `${Math.abs(value).toFixed(digits)}%`;
+}
+
+function getEmploymentColor(value) {
+    if (!Number.isFinite(value)) return '#94a3b8';
+    if (value >= 8) return '#15803d';
+    if (value > 0) return '#22c55e';
+    if (value <= -8) return '#b91c1c';
+    if (value < 0) return '#ef4444';
+    return '#94a3b8';
+}
+
+function getEmploymentBadgeStyle(value) {
+    if (!Number.isFinite(value)) {
+        return {
+            display: 'inline-block',
+            padding: '2px 8px',
+            borderRadius: '999px',
+            fontWeight: '600',
+            fontSize: '12px',
+            backgroundColor: '#f1f5f9',
+            color: '#475569',
+            border: '1px solid #cbd5e1',
+        };
+    }
+    const positive = value >= 0;
+    return {
+        display: 'inline-block',
+        padding: '2px 8px',
+        borderRadius: '999px',
+        fontWeight: '600',
+        fontSize: '12px',
+        backgroundColor: positive ? '#dcfce7' : '#fee2e2',
+        color: positive ? '#166534' : '#991b1b',
+        border: `1px solid ${positive ? '#86efac' : '#fca5a5'}`,
+    };
+}
+
+function computeEmploymentChangeByQuintile(headcountData) {
+    const overall = headcountData?.overall_usage;
+    if (!overall?.dates || !overall?.quintiles) return null;
+
+    const startMonthPrefix = CHATGPT_RELEASE_DATE.slice(0, 7);
+    const startIndex = overall.dates.findIndex((d) => d.startsWith(startMonthPrefix));
+    const endIndex = overall.dates.length - 1;
+    if (startIndex < 0 || endIndex < 0) return null;
+
+    const changes = {};
+    QUINTILE_ORDER.forEach((q) => {
+        const series = overall.quintiles[String(q)] || overall.quintiles[q];
+        if (!series || series[startIndex] == null || series[endIndex] == null) return;
+        const startValue = Number(series[startIndex]);
+        const endValue = Number(series[endIndex]);
+        if (!Number.isFinite(startValue) || !Number.isFinite(endValue) || startValue === 0) return;
+        changes[q] = ((endValue / startValue) - 1) * 100;
+    });
+
+    return changes;
+}
   
 /* Stores data for each occupation. The data is the two digit SOC code, the name of the occupation, 
    the 2024 median salary, the number of times a user has viewed the detailed information, 
@@ -219,129 +326,212 @@ function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedIte
     );
 }
 
-// Single occupation TieredSteps (for the fourth page)
-// INVERTED VERSION: Bars go DOWN, deeper = more exposed
-function SingleTieredSteps({ ranking, occupation }) {
-    // 5 tiers with red-yellow-green color scale (no blue)
-    const tiers = [
-        { label: '1-20', displayLabel: 'Very High', color: '#dc2626' },    // Red
-        { label: '21-40', displayLabel: 'High', color: '#f97316' },        // Orange
-        { label: '41-60', displayLabel: 'Moderate', color: '#eab308' },    // Yellow
-        { label: '61-80', displayLabel: 'Low', color: '#22c55e' },         // Green
-        { label: '81-100', displayLabel: 'Very Low', color: '#16a34a' },   // Dark Green
-    ];
+function EmploymentChangeChart({ occupationName, ranking, employmentChangeByQuintile, showExposureGuide = true }) {
+    if (!employmentChangeByQuintile) {
+        return (
+            <div style={{
+                marginTop: '15px',
+                padding: '15px',
+                backgroundColor: '#f8fafc',
+                borderRadius: '6px',
+                border: '1px solid #e2e8f0',
+                color: '#334155',
+            }}>
+                Loading employment trend data...
+            </div>
+        );
+    }
 
-    const getTierIndex = (rank) => {
-        if (rank <= 20) return 0;
-        if (rank <= 40) return 1;
-        if (rank <= 60) return 2;
-        if (rank <= 80) return 3;
-        return 4;
-    };
-    const activeTier = getTierIndex(ranking);
+    const participantQuintile = getExposureQuintile(ranking);
+    const participantMeta = QUINTILE_META[participantQuintile];
+    const participantValue = employmentChangeByQuintile[participantQuintile];
+
+    const chartData = QUINTILE_ORDER.map((q) => ({
+        quintile: q,
+        label: QUINTILE_META[q].title,
+        value: employmentChangeByQuintile[q],
+    })).filter((d) => Number.isFinite(d.value));
+
+    if (!chartData.length || !Number.isFinite(participantValue)) {
+        return (
+            <div style={{
+                marginTop: '15px',
+                padding: '15px',
+                backgroundColor: '#f8fafc',
+                borderRadius: '6px',
+                border: '1px solid #e2e8f0',
+                color: '#334155',
+            }}>
+                Employment trend data is not available for this occupation group.
+            </div>
+        );
+    }
+
+    const values = chartData.map((d) => d.value);
+    const minValue = Math.min(...values, 0);
+    const maxValue = Math.max(...values, 0);
+    const rawRange = maxValue - minValue;
+    const padding = Math.max(1, rawRange * 0.15);
+    const yMin = minValue - padding;
+    const yMax = maxValue + padding;
+
+    const chartLeft = 64;
+    const chartTop = 24;
+    const chartWidth = 620;
+    const chartHeight = 240;
+    const slotWidth = chartWidth / chartData.length;
+    const barWidth = Math.min(78, slotWidth * 0.58);
+
+    const yScale = (v) => chartTop + ((yMax - v) / (yMax - yMin)) * chartHeight;
+    const zeroY = yScale(0);
+    const tickValues = [yMax, 0, yMin]
+        .filter((v, i, arr) => arr.findIndex((x) => Math.abs(x - v) < 0.0001) === i);
+
+    const direction = participantValue >= 0 ? 'growth' : 'decline';
+    const participantWorkers = Math.round(Math.abs(participantValue));
+    const plainLanguageText = participantValue >= 0
+        ? `What does this mean? For your group, the change is ${formatSignedPercent(participantValue)}. That means roughly ${participantWorkers} jobs were added for every 100 workers.`
+        : `What does this mean? For your group, the change is ${formatSignedPercent(participantValue)}. That means roughly ${participantWorkers} out of every 100 workers in this group lost their jobs.`;
 
     return (
-        <div style={{ textAlign: 'center', marginBottom: '24px', width: '100%' }}>
-            <div style={{ marginBottom: '16px', color: '#334155', fontSize: '18px' }}>
-                <strong>{occupation}</strong>
-            </div>
-
-            <div style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                justifyContent: 'center',
-                gap: '12px',
-                marginBottom: '16px',
-                paddingBottom: '80px'
-            }}>
-                {tiers.map((tier, index) => {
-                    const isActive = index === activeTier;
-                    const height = 160 - index * 20;
-
+        <div style={{
+            marginTop: '15px',
+            padding: '15px',
+            backgroundColor: '#f8fafc',
+            borderRadius: '6px',
+            border: '1px solid #e2e8f0',
+        }}>
+            <svg viewBox="0 0 760 340" style={{ width: '100%', height: 'auto' }}>
+                {tickValues.map((tick) => {
+                    const y = yScale(tick);
                     return (
-                        <div key={tier.label} style={{ position: 'relative' }}>
-                            {/* The tier bar */}
-                            <div style={{
-                                width: '100px',
-                                height: `${height}px`,
-                                backgroundColor: isActive ? tier.color : `${tier.color}15`,
-                                border: `3px solid ${tier.color}`,
-                                borderRadius: '0 0 12px 12px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                transition: 'background-color 0.3s'
-                            }}>
-                                <span style={{
-                                    fontSize: '14px',
-                                    fontWeight: '700',
-                                    color: isActive ? '#fff' : tier.color,
-                                }}>
-                                    {tier.displayLabel}
-                                </span>
-                                <span style={{
-                                    fontSize: '11px',
-                                    fontWeight: '500',
-                                    color: isActive ? 'rgba(255,255,255,0.8)' : tier.color,
-                                    marginTop: '2px'
-                                }}>
-                                    {tier.label}
-                                </span>
-                            </div>
-                            {/* Occupation label below the bar */}
-                            {isActive && (
-                                <div style={{
-                                    position: 'absolute',
-                                    top: `${height + 12}px`,
-                                    left: '50%',
-                                    transform: 'translateX(-50%)',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: '0px'
-                                }}>
-                                    {/* Arrow pointing up */}
-                                    <div style={{
-                                        width: 0,
-                                        height: 0,
-                                        borderLeft: '10px solid transparent',
-                                        borderRight: '10px solid transparent',
-                                        borderBottom: `12px solid ${tier.color}`
-                                    }} />
-                                    <div style={{
-                                        backgroundColor: tier.color,
-                                        color: '#fff',
-                                        padding: '8px 14px',
-                                        borderRadius: '8px',
-                                        fontSize: '12px',
-                                        fontWeight: '600',
-                                        whiteSpace: 'normal',
-                                        maxWidth: '160px',
-                                        lineHeight: '1.3',
-                                        textAlign: 'center',
-                                        boxShadow: '0 3px 10px rgba(0,0,0,0.2)'
-                                    }}>
-                                        {occupation}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        <g key={`tick-${tick}`}>
+                            <line
+                                x1={chartLeft}
+                                y1={y}
+                                x2={chartLeft + chartWidth}
+                                y2={y}
+                                stroke="#e2e8f0"
+                                strokeWidth={1}
+                            />
+                            <text
+                                x={chartLeft - 10}
+                                y={y + 4}
+                                textAnchor="end"
+                                fill="#64748b"
+                                fontSize="12"
+                            >
+                                {formatSignedPercent(tick)}
+                            </text>
+                        </g>
                     );
                 })}
-            </div>
+
+                <line
+                    x1={chartLeft}
+                    y1={zeroY}
+                    x2={chartLeft + chartWidth}
+                    y2={zeroY}
+                    stroke="#475569"
+                    strokeWidth={1.5}
+                />
+
+                {chartData.map((d, idx) => {
+                    const x = chartLeft + idx * slotWidth + (slotWidth - barWidth) / 2;
+                    const y = d.value >= 0 ? yScale(d.value) : zeroY;
+                    const height = Math.max(2, Math.abs(yScale(d.value) - zeroY));
+                    const isParticipant = d.quintile === participantQuintile;
+                    const fill = isParticipant ? '#f59e0b' : getEmploymentColor(d.value);
+                    const stroke = isParticipant ? '#7c2d12' : '#33415522';
+                    const valueLabelY = d.value >= 0 ? y - 8 : y + height + 16;
+
+                    return (
+                        <g key={d.label}>
+                            <rect
+                                x={x}
+                                y={y}
+                                width={barWidth}
+                                height={height}
+                                fill={fill}
+                                stroke={stroke}
+                                strokeWidth={isParticipant ? 2.5 : 1}
+                                rx={4}
+                            />
+                            <text
+                                x={x + barWidth / 2}
+                                y={valueLabelY}
+                                textAnchor="middle"
+                                fill="#334155"
+                                fontSize="12"
+                                fontWeight="600"
+                            >
+                                {formatSignedPercent(d.value)}
+                            </text>
+                            <text
+                                x={x + barWidth / 2}
+                                y={chartTop + chartHeight + 24}
+                                textAnchor="middle"
+                                fill="#334155"
+                                fontSize="12"
+                                fontWeight="600"
+                            >
+                                {d.label}
+                            </text>
+                        </g>
+                    );
+                })}
+
+                <text
+                    x={18}
+                    y={chartTop - 4}
+                    fill="#334155"
+                    fontSize="12"
+                    fontWeight="600"
+                >
+                    Employment Change
+                </text>
+            </svg>
+
+            <p style={{ marginTop: '8px', marginBottom: '10px', lineHeight: '1.5', color: '#334155' }}>
+                The chart below shows how employment for young workers has changed since the release of ChatGPT in November 2022, grouped by AI exposure. Your group is the orange bar highlighted by the dark border.
+            </p>
+
+            <p style={{ marginBottom: '10px', lineHeight: '1.5', color: '#334155' }}>
+                Workers in <strong>{occupationName}</strong> have been grouped in the{' '}
+                <strong>{participantMeta.textLabel}</strong> AI exposure category. This group has historically experienced{' '}
+                <strong>{formatAbsPercent(participantValue)} {direction}</strong> in employment since the release of ChatGPT.
+            </p>
 
             <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                maxWidth: '420px',
-                margin: '0 auto',
-                fontSize: '10px',
-                color: '#64748b'
+                marginBottom: '10px',
+                padding: '10px',
+                backgroundColor: '#fff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
             }}>
-                <span>← Most Exposed</span>
-                <span>Least Exposed →</span>
+                <p style={{ margin: 0, lineHeight: '1.5', color: '#334155' }}>
+                    {plainLanguageText}
+                </p>
             </div>
+
+            {showExposureGuide && (
+                <div style={{
+                    marginTop: '10px',
+                    padding: '10px',
+                    backgroundColor: '#fff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                }}>
+                    <p style={{ marginTop: 0, marginBottom: '8px', fontWeight: '600', color: '#334155' }}>
+                        How to interpret exposure groups
+                    </p>
+                    {QUINTILE_ORDER.slice().reverse().map((q) => (
+                        <p key={`exposure-guide-${q}`} style={{ margin: '4px 0', lineHeight: '1.5', color: '#334155' }}>
+                            <strong>{QUINTILE_META[q].title} exposure:</strong> {QUINTILE_META[q].explanation}
+                        </p>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
@@ -405,6 +595,7 @@ function AIExposureVisualization() {
     const [csvLoading, setCsvLoading] = useState(true);
     const [csvError, setCsvError] = useState(null);
     const [socCodeMap, setSocCodeMap] = useState({});
+    const [employmentChangeByQuintile, setEmploymentChangeByQuintile] = useState(null);
 
     // Used to store the current user-inputted search term
     const [searchTerm, setSearchTerm] = useState('');
@@ -536,6 +727,27 @@ function AIExposureVisualization() {
         }
 
         fetchCSV();
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function fetchEmploymentData() {
+            try {
+                const response = await fetch(EMPLOYMENT_DATA_URL);
+                if (!response.ok) throw new Error('Failed to fetch employment data');
+                const payload = await response.json();
+                if (!cancelled) {
+                    setEmploymentChangeByQuintile(computeEmploymentChangeByQuintile(payload));
+                }
+            } catch (err) {
+                console.error('Employment data fetch error:', err);
+                if (!cancelled) setEmploymentChangeByQuintile(null);
+            }
+        }
+
+        fetchEmploymentData();
+        return () => { cancelled = true; };
     }, []);
 
     // Helper to get ranking for an occupation (fallback to 50 if not found)
@@ -956,179 +1168,187 @@ function AIExposureVisualization() {
                 </div>
             )}
 
-            {/* Displays the second page - with TieredSteps visualization */}
-            {ranked && (
-                <>
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                        gap: '15px',
-                        marginBottom: '30px'
-                    }}>
+            {/* Displays the second page - with employment change visualization */}
+            {ranked && (() => {
+                const chartOccupation = selectedItem || ranked[0];
+                const chartRanking = chartOccupation ? getRanking(chartOccupation.name) : null;
+
+                return (
+                    <>
                         <div style={{
-                            backgroundColor: 'white',
-                            padding: '15px',
-                            borderRadius: '8px',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                            gap: '15px',
+                            marginBottom: '30px'
                         }}>
-                            <p style={{
-                                textAlign: 'center',
-                                marginBottom: '10px',
-                                color: 'black'
-                            }}>
-                                Here are the occupations you selected and their AI exposure levels.
-                            </p>
-                            <p style={{ textAlign: 'center', marginBottom: '20px', color: '#666', fontSize: '14px' }}>
-                                Ranking goes from 1 (most exposed to AI) to 100 (least exposed to AI).
-                            </p>
-
-                            {/* Single TieredSteps visualization showing all occupations */}
                             <div style={{
-                                marginBottom: '30px',
-                                padding: '20px',
-                                backgroundColor: '#f8fafc',
+                                backgroundColor: 'white',
+                                padding: '15px',
                                 borderRadius: '8px',
-                                border: '1px solid #e2e8f0',
-                                overflowX: 'auto'
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
                             }}>
-                                <TieredSteps
-                                    occupations={ranked}
-                                    getRankingFn={getRanking}
-                                    onOccupationClick={handleItemClickDetailed}
-                                    selectedItem={selectedItem}
-                                />
-                            </div>
+                                <p style={{
+                                    textAlign: 'center',
+                                    marginBottom: '10px',
+                                    color: 'black'
+                                }}>
+                                    Here are the occupations you selected and their AI exposure categories.
+                                </p>
+                                <p style={{ textAlign: 'center', marginBottom: '20px', color: '#666', fontSize: '14px' }}>
+                                    The chart uses the currently selected occupation. Click an occupation below to update the highlighted group.
+                                </p>
 
-                            {/* List of occupations with click-to-expand details */}
-                            <p style={{ marginBottom: '15px', color: 'black', fontWeight: '500' }}>
-                                Click on an occupation below for more details:
-                            </p>
-                            <div>
-                                {ranked.map((item, index) => {
-                                    const ranking = getRanking(item.name);
-                                    const exposure = getExposureLevel(ranking);
-                                    return (
-                                        <div key={item.name} style={{ marginBottom: '10px' }}>
-                                            <button
-                                                onClick={() => handleItemClickDetailed(item)}
-                                                style={{
-                                                    backgroundColor: getButtonColor(ranking),
-                                                    border: '1px solid #ccc',
-                                                    borderRadius: '6px',
-                                                    padding: '12px 16px',
-                                                    cursor: 'pointer',
-                                                    color: '#222',
-                                                    fontWeight: 'bold',
-                                                    fontSize: '0.95rem',
-                                                    width: '100%',
-                                                    textAlign: 'left',
-                                                    transition: 'background 0.2s',
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center'
-                                                }}
-                                            >
-                                                <span>
-                                                    {index + 1}. {item.name}
-                                                </span>
-                                                <span style={{ 
-                                                    color: exposure.color, 
-                                                    fontSize: '0.85rem',
-                                                    fontWeight: '600'
-                                                }}>
-                                                    {exposure.level}
-                                                </span>
-                                            </button>
+                                {chartOccupation && Number.isFinite(chartRanking) && (
+                                    <EmploymentChangeChart
+                                        occupationName={chartOccupation.name}
+                                        ranking={chartRanking}
+                                        employmentChangeByQuintile={employmentChangeByQuintile}
+                                        showExposureGuide={true}
+                                    />
+                                )}
 
-                                            {/* Expanded details section */}
-                                            {selectedItem?.name === item.name && (
-                                                <div style={{
-                                                    marginTop: '10px',
-                                                    padding: '15px',
-                                                    backgroundColor: '#f0f9ff',
-                                                    borderRadius: '6px',
-                                                    border: '1px solid #bfdbfe'
-                                                }}>
-                                                    <h4 style={{ marginBottom: '10px', fontWeight: 'bold', color: '#1e40af' }}>
-                                                        Detailed Information
-                                                    </h4>
+                                {/* List of occupations with click-to-expand details */}
+                                <p style={{ marginTop: '20px', marginBottom: '15px', color: 'black', fontWeight: '500' }}>
+                                    Click on an occupation below for more details:
+                                </p>
+                                <div>
+                                    {ranked.map((item, index) => {
+                                        const ranking = getRanking(item.name);
+                                        const quintile = getExposureQuintile(ranking);
+                                        const quintileMeta = QUINTILE_META[quintile];
+                                        const quintileEmploymentChange = employmentChangeByQuintile?.[quintile];
+                                        return (
+                                            <div key={item.name} style={{ marginBottom: '10px' }}>
+                                                <button
+                                                    onClick={() => handleItemClickDetailed(item)}
+                                                    style={{
+                                                        backgroundColor: getButtonColor(ranking),
+                                                        border: '1px solid #ccc',
+                                                        borderRadius: '6px',
+                                                        padding: '12px 16px',
+                                                        cursor: 'pointer',
+                                                        color: '#222',
+                                                        fontWeight: 'bold',
+                                                        fontSize: '0.95rem',
+                                                        width: '100%',
+                                                        textAlign: 'left',
+                                                        transition: 'background 0.2s',
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center'
+                                                    }}
+                                                >
+                                                    <span>
+                                                        {index + 1}. {item.name}
+                                                    </span>
+                                                    <span style={getEmploymentBadgeStyle(quintileEmploymentChange)}>
+                                                        {quintileMeta.title} exposure
+                                                    </span>
+                                                </button>
 
-                                                    <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
-                                                        Workers in <strong>{selectedItem.name}</strong> have{' '}
-                                                        <strong style={{ color: exposure.color }}>
-                                                            {exposure.level}
-                                                        </strong> AI exposure.
-                                                    </p>
+                                                {/* Expanded details section */}
+                                                {selectedItem?.name === item.name && (
+                                                    <div style={{
+                                                        marginTop: '10px',
+                                                        padding: '15px',
+                                                        backgroundColor: '#f0f9ff',
+                                                        borderRadius: '6px',
+                                                        border: '1px solid #bfdbfe'
+                                                    }}>
+                                                        <h4 style={{ marginBottom: '10px', fontWeight: 'bold', color: '#1e40af' }}>
+                                                            Detailed Information
+                                                        </h4>
 
-                                                    {(() => {
-                                                        const relatedOccs = [selectedItem.related_soc_code_1, selectedItem.related_soc_code_2, selectedItem.related_soc_code_3]
-                                                            .filter(Boolean)
-                                                            .map(code => socCodeMap[code])
-                                                            .filter(Boolean);
-                                                        return relatedOccs.length > 0 ? (
-                                                            <>
-                                                                <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
-                                                                    <strong>Occupations similar to {selectedItem.name} are shown below.</strong>
+                                                        {(() => {
+                                                            const selectedQuintile = getExposureQuintile(ranking);
+                                                            const selectedMeta = QUINTILE_META[selectedQuintile];
+                                                            const selectedChange = employmentChangeByQuintile?.[selectedQuintile];
+
+                                                            return (
+                                                                <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
+                                                                    Workers in <strong>{selectedItem.name}</strong> have{' '}
+                                                                    <strong style={{ color: getEmploymentColor(selectedChange) }}>
+                                                                        {selectedMeta.textLabel}
+                                                                    </strong> AI exposure.
                                                                 </p>
-                                                                <ol style={{ paddingLeft: '20px', marginBottom: '15px', lineHeight: '1.8', color: 'black' }}>
-                                                                    {relatedOccs.map(occ => {
-                                                                        const similarExposure = getExposureLevel(occ.ranking);
-                                                                        return (
-                                                                            <li key={occ.soc_code}>
-                                                                                <strong>{occ.name}</strong>:{' '}
-                                                                                <span style={{ color: similarExposure.color, fontWeight: '600' }}>
-                                                                                    {similarExposure.level}
-                                                                                </span> exposure (#{occ.ranking})
-                                                                            </li>
-                                                                        );
-                                                                    })}
-                                                                </ol>
-                                                            </>
-                                                        ) : null;
-                                                    })()}
+                                                            );
+                                                        })()}
 
-                                                    {(() => {
-                                                        const relatedOccs = [selectedItem.related_soc_code_1, selectedItem.related_soc_code_2, selectedItem.related_soc_code_3]
-                                                            .filter(Boolean)
-                                                            .map(code => socCodeMap[code])
-                                                            .filter(Boolean);
-                                                        const allOccs = [selectedItem, ...relatedOccs];
-                                                        return (
-                                                            <>
-                                                                <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
-                                                                    <strong>Relevant areas of study</strong>
-                                                                </p>
-                                                                <ul style={{ paddingLeft: '20px', marginBottom: '10px', lineHeight: '1.8', color: 'black' }}>
-                                                                    {allOccs.map(occ => {
-                                                                        const edu = formatEducation(occ.educationcode);
-                                                                        const degFields = [occ.degfield_1, occ.degfield_2, occ.degfield_3]
-                                                                            .filter(Boolean)
-                                                                            .map(capitalizeField);
-                                                                        return (
-                                                                            <li key={occ.soc_code || occ.name}>
-                                                                                {occ.name}: {edu.hasBachelors
-                                                                                    ? 'The majority of workers in this occupation hold at least a college (bachelor\'s) degree.'
-                                                                                    : 'The majority of workers in this occupation have less than a college (bachelor\'s) degree.'}
-                                                                                {edu.hasBachelors && degFields.length > 0 && (
-                                                                                    <> Workers typically study <strong>{listFormatter.format(degFields)}</strong>.</>
-                                                                                )}
-                                                                            </li>
-                                                                        );
-                                                                    })}
-                                                                </ul>
-                                                            </>
-                                                        );
-                                                    })()}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                                        {(() => {
+                                                            const relatedOccs = [selectedItem.related_soc_code_1, selectedItem.related_soc_code_2, selectedItem.related_soc_code_3]
+                                                                .filter(Boolean)
+                                                                .map(code => socCodeMap[code])
+                                                                .filter(Boolean);
+                                                            return relatedOccs.length > 0 ? (
+                                                                <>
+                                                                    <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
+                                                                        <strong>Occupations similar to {selectedItem.name} are shown below.</strong>
+                                                                    </p>
+                                                                    <p style={{ lineHeight: '1.5', color: '#334155', marginTop: '6px', marginBottom: '8px', fontSize: '13px' }}>
+                                                                        Color follows the employment chart: green groups have growth and red groups have decline.
+                                                                    </p>
+                                                                    <ol style={{ paddingLeft: '20px', marginBottom: '15px', lineHeight: '1.8', color: 'black' }}>
+                                                                        {relatedOccs.map(occ => {
+                                                                            const similarQuintile = getExposureQuintile(occ.ranking);
+                                                                            const similarMeta = QUINTILE_META[similarQuintile];
+                                                                            const similarChange = employmentChangeByQuintile?.[similarQuintile];
+                                                                            return (
+                                                                                <li key={occ.soc_code}>
+                                                                                    <strong>{occ.name}</strong>:{' '}
+                                                                                    <span style={getEmploymentBadgeStyle(similarChange)}>
+                                                                                        {similarMeta.title} exposure
+                                                                                    </span>
+                                                                                </li>
+                                                                            );
+                                                                        })}
+                                                                    </ol>
+                                                                </>
+                                                            ) : null;
+                                                        })()}
+
+                                                        {(() => {
+                                                            const relatedOccs = [selectedItem.related_soc_code_1, selectedItem.related_soc_code_2, selectedItem.related_soc_code_3]
+                                                                .filter(Boolean)
+                                                                .map(code => socCodeMap[code])
+                                                                .filter(Boolean);
+                                                            const allOccs = [selectedItem, ...relatedOccs];
+                                                            return (
+                                                                <>
+                                                                    <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
+                                                                        <strong>Relevant areas of study</strong>
+                                                                    </p>
+                                                                    <ul style={{ paddingLeft: '20px', marginBottom: '10px', lineHeight: '1.8', color: 'black' }}>
+                                                                        {allOccs.map(occ => {
+                                                                            const edu = formatEducation(occ.educationcode);
+                                                                            const degFields = [occ.degfield_1, occ.degfield_2, occ.degfield_3]
+                                                                                .filter(Boolean)
+                                                                                .map(capitalizeField);
+                                                                            return (
+                                                                                <li key={occ.soc_code || occ.name}>
+                                                                                    {occ.name}: {edu.hasBachelors
+                                                                                        ? 'The majority of workers in this occupation hold at least a college (bachelor\'s) degree.'
+                                                                                        : 'The majority of workers in this occupation have less than a college (bachelor\'s) degree.'}
+                                                                                    {edu.hasBachelors && degFields.length > 0 && (
+                                                                                        <> Workers typically study <strong>{listFormatter.format(degFields)}</strong>.</>
+                                                                                    )}
+                                                                                </li>
+                                                                            );
+                                                                        })}
+                                                                    </ul>
+                                                                </>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </>
-            )}
+                    </>
+                );
+            })()}
 
             {/* Displays the third page - Top 3 most and least exposed */}
             {/* TEMPORARILY DISABLED - to re-enable, remove "false &&" below and in navigation buttons */}
@@ -1261,12 +1481,14 @@ function AIExposureVisualization() {
                                 </h4>
                                 {(() => {
                                     const ranking = getRanking(selectedItem.name);
-                                    const exposure = getExposureLevel(ranking);
+                                    const selectedQuintile = getExposureQuintile(ranking);
+                                    const selectedMeta = QUINTILE_META[selectedQuintile];
+                                    const selectedChange = employmentChangeByQuintile?.[selectedQuintile];
                                     return (
                                         <>
                                             <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
                                                 Workers in <strong>{selectedItem.name}</strong> have{' '}
-                                                <strong style={{ color: exposure.color }}>{exposure.level}</strong> AI exposure.
+                                                <strong style={{ color: getEmploymentColor(selectedChange) }}>{selectedMeta.textLabel}</strong> AI exposure.
                                             </p>
 
                                             {(() => {
@@ -1279,15 +1501,20 @@ function AIExposureVisualization() {
                                                         <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
                                                             <strong>Occupations similar to {selectedItem.name} are shown below.</strong>
                                                         </p>
+                                                        <p style={{ lineHeight: '1.5', color: '#334155', marginTop: '6px', marginBottom: '8px', fontSize: '13px' }}>
+                                                            Color follows the employment chart: green groups have growth and red groups have decline.
+                                                        </p>
                                                         <ol style={{ paddingLeft: '20px', marginBottom: '15px', lineHeight: '1.8', color: 'black' }}>
                                                             {relatedOccs.map(occ => {
-                                                                const similarExposure = getExposureLevel(occ.ranking);
+                                                                const similarQuintile = getExposureQuintile(occ.ranking);
+                                                                const similarMeta = QUINTILE_META[similarQuintile];
+                                                                const similarChange = employmentChangeByQuintile?.[similarQuintile];
                                                                 return (
                                                                     <li key={occ.soc_code}>
                                                                         <strong>{occ.name}</strong>:{' '}
-                                                                        <span style={{ color: similarExposure.color, fontWeight: '600' }}>
-                                                                            {similarExposure.level}
-                                                                        </span> exposure (#{occ.ranking})
+                                                                        <span style={getEmploymentBadgeStyle(similarChange)}>
+                                                                            {similarMeta.title} exposure
+                                                                        </span>
                                                                     </li>
                                                                 );
                                                             })}
@@ -1427,41 +1654,47 @@ function AIExposureVisualization() {
                     </div>
 
                     {/* Detail view for fourth page */}
-                    {selectedItemEnd && (
-                        <div style={{
-                            backgroundColor: 'white',
-                            padding: '20px',
-                            borderRadius: '10px',
-                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                            marginBottom: '20px'
-                        }}>
-                            <SingleTieredSteps
-                                ranking={getRanking(selectedItemEnd.name)}
-                                occupation={selectedItemEnd.name}
-                            />
+                    {selectedItemEnd && (() => {
+                        const ranking = getRanking(selectedItemEnd.name);
+                        const selectedQuintile = getExposureQuintile(ranking);
+                        const selectedMeta = QUINTILE_META[selectedQuintile];
+                        const selectedChange = employmentChangeByQuintile?.[selectedQuintile];
+
+                        return (
                             <div style={{
-                                marginTop: '20px',
-                                padding: '15px',
-                                backgroundColor: '#f0f9ff',
-                                borderRadius: '6px',
-                                border: '1px solid #bfdbfe'
+                                backgroundColor: 'white',
+                                padding: '20px',
+                                borderRadius: '10px',
+                                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                                marginBottom: '20px'
                             }}>
-                                <h4 style={{ marginBottom: '10px', fontWeight: 'bold', color: '#1e40af' }}>
-                                    More Detailed Information
-                                </h4>
-                                {(() => {
-                                    const ranking = getRanking(selectedItemEnd.name);
-                                    const exposure = getExposureLevel(ranking);
-                                    return (
-                                        <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
-                                            Workers in <strong>{selectedItemEnd.name}</strong> have{' '}
-                                            <strong style={{ color: exposure.color }}>{exposure.level}</strong> AI exposure.
-                                        </p>
-                                    );
-                                })()}
+                                <EmploymentChangeChart
+                                    occupationName={selectedItemEnd.name}
+                                    ranking={ranking}
+                                    employmentChangeByQuintile={employmentChangeByQuintile}
+                                    showExposureGuide={false}
+                                />
+                                <div style={{
+                                    marginTop: '20px',
+                                    padding: '15px',
+                                    backgroundColor: '#f0f9ff',
+                                    borderRadius: '6px',
+                                    border: '1px solid #bfdbfe'
+                                }}>
+                                    <h4 style={{ marginBottom: '10px', fontWeight: 'bold', color: '#1e40af' }}>
+                                        More Detailed Information
+                                    </h4>
+                                    <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
+                                        Workers in <strong>{selectedItemEnd.name}</strong> have{' '}
+                                        <strong style={{ color: getEmploymentColor(selectedChange) }}>{selectedMeta.textLabel}</strong> AI exposure.
+                                    </p>
+                                    <p style={{ marginBottom: 0, lineHeight: '1.5', color: '#334155' }}>
+                                        {selectedMeta.explanation}
+                                    </p>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
                 </>
             )}
 
