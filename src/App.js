@@ -16,7 +16,7 @@ npm install
 npm start
 */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 // CSV URL
 const CSV_URL = process.env.PUBLIC_URL + '/aei_exposure_6digit.csv';
@@ -28,7 +28,7 @@ const QUINTILE_META = {
     1: {
         title: 'Very Low',
         textLabel: 'very low',
-        explanation: 'These occupations rely on tasks AI currently struggles with, especially physical, hands-on, or highly context-specific work.',
+        explanation: 'These occupations rely on tasks AI currently struggles with, for example physical, hands-on, or highly context-specific work.',
     },
     2: {
         title: 'Low',
@@ -789,19 +789,12 @@ function EmploymentChangeChart({
                         <strong style={{ color: participantBarColor }}>{formatAbsPercent(participantValue)}</strong>{' '}
                         {direction} in employment since the release of ChatGPT in November 2022.
                     </li>
+                    <li>
+                        {participantValue >= 0
+                            ? `That means roughly ${participantWorkers} jobs were added for every 100 workers.`
+                            : `That means roughly ${participantWorkers} out of every 100 workers in this group lost their jobs.`}
+                    </li>
                 </ul>
-            </div>
-
-            <div style={{
-                marginBottom: '10px',
-                padding: '10px',
-                backgroundColor: '#fff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '6px',
-            }}>
-                <p style={{ margin: 0, lineHeight: '1.5', color: '#334155' }}>
-                    {plainLanguageText}
-                </p>
             </div>
 
             {showExposureGuide && (
@@ -819,6 +812,8 @@ function EmploymentChangeChart({
                         <li>Jobs range from Very High to Very Low exposure.</li>
                         <li>More exposure means more tasks in that job can be done or helped by AI.</li>
                         <li>Less exposure means fewer tasks can currently be done by AI.</li>
+                        <li>Similar-sounding occupations may have different exposure levels due to differences in tasks.</li>
+                        <li>You will have a chance to ask questions about these results to an AI agent later in this survey.</li>
                     </ul>
                 </div>
             )}
@@ -903,6 +898,8 @@ function AIExposureVisualization() {
     const [showSearch, setShowSearch] = useState(true);
     // Used to determine whether to display the third page
     const [showTop, setShowTop] = useState(false);
+    // Used to determine whether to display the transition screen before page 4
+    const [showTransition, setShowTransition] = useState(false);
     // Used to determine whether to display the final page
     const [showEnd, setShowEnd] = useState(false);
     // Used to track the time spent on the current page
@@ -919,8 +916,42 @@ function AIExposureVisualization() {
     const [searchScreenTimeStart, setSearchScreenTimeStart] = useState(null);
     const [searchScreenTotalTime, setSearchScreenTotalTime] = useState(0);
 
+    // Comprehensive event-level tracking for page 4
+    const searchScreenEvents = useRef([]);
+    const searchScreenStartTime = useRef(null);
+    const detailOpenTimeRef = useRef(null);
+    const searchDebounceRef = useRef(null);
+    const maxScrollRef = useRef(0);
+
+    // Exposure-level filter buttons for page 4
+    const [exposureFilters, setExposureFilters] = useState(new Set());
+    // Occupation group filter (2-digit SOC)
+    const [occGroupFilter, setOccGroupFilter] = useState('');
+    // Education filter: 'college' (bachelor's+) or 'nocollege'
+    const [educationFilter, setEducationFilter] = useState('');
+    // Field of study filter
+    const [fieldOfStudyFilter, setFieldOfStudyFilter] = useState('');
+
+    // Qualtrics occupation pass-through via URL parameters
+    const [preselectedOccupations, setPreselectedOccupations] = useState(null);
+
     // Get correct listing of elements. Ex. X, Y, and Z
     const listFormatter = new Intl.ListFormat('en-US', { style: 'long', type: 'conjunction' });
+
+    // 2-digit SOC code to group name mapping
+    const socGroupMap = {};
+    mockData.occupations.forEach(o => { socGroupMap[String(o.two_digit_soc_code)] = o.name; });
+
+    // Unique degree fields derived from CSV data
+    const allDegreeFields = React.useMemo(() => {
+        const fieldSet = new Set();
+        occupationList.forEach(occ => {
+            [occ.degfield_1, occ.degfield_2, occ.degfield_3].forEach(f => {
+                if (f && f.trim()) fieldSet.add(f.trim().toLowerCase());
+            });
+        });
+        return [...fieldSet].sort().map(f => capitalizeField(f));
+    }, [occupationList]);
 
     // Fetch CSV data on component mount
     useEffect(() => {
@@ -1009,6 +1040,31 @@ function AIExposureVisualization() {
                 setOccupationList(occList);
                 setSocCodeMap(socMap);
                 setCsvLoading(false);
+
+                // Check for URL parameters (Qualtrics occupation pass-through)
+                const params = new URLSearchParams(window.location.search);
+                const passedOccs = [];
+                for (let i = 1; i <= 6; i++) {
+                    const name = params.get(`occ${i}`);
+                    if (name) passedOccs.push(decodeURIComponent(name));
+                }
+                if (passedOccs.length > 0) {
+                    // Match each passed occupation to the closest in the data
+                    const matched = passedOccs.map(typed => {
+                        const typedLower = typed.toLowerCase().trim();
+                        // 1. Exact case-insensitive match
+                        let match = occList.find(o => o.name.toLowerCase() === typedLower);
+                        if (!match) {
+                            // 2. Substring match (occupation contains typed or typed contains occupation)
+                            match = occList.find(o =>
+                                o.name.toLowerCase().includes(typedLower) ||
+                                typedLower.includes(o.name.toLowerCase())
+                            );
+                        }
+                        return { typed, match: match || null };
+                    });
+                    setPreselectedOccupations(matched);
+                }
             } catch (err) {
                 console.error('CSV fetch error:', err);
                 setCsvError(err.message);
@@ -1044,6 +1100,55 @@ function AIExposureVisualization() {
     const getRanking = (occupationName) => {
         const key = occupationName.toLowerCase();
         return rankingData[key] ?? 50; // Default to middle ranking if not found
+    };
+
+    // Log an event for the search screen (page 4)
+    const logSearchEvent = (eventType, details) => {
+        if (!searchScreenStartTime.current) return;
+        searchScreenEvents.current.push({
+            type: eventType,
+            time: parseFloat(((Date.now() - searchScreenStartTime.current) / 1000).toFixed(1)),
+            ...details
+        });
+    };
+
+    // Debounced search input handler for page 4
+    const handleSearchInputChange = (e) => {
+        const value = e.target.value;
+        setSearchTerm(value);
+        clearTimeout(searchDebounceRef.current);
+        if (value.trim()) {
+            searchDebounceRef.current = setTimeout(() => {
+                const resultCount = occupationList.filter(item =>
+                    item.name.toLowerCase().includes(value.toLowerCase())
+                ).length;
+                logSearchEvent('search', { term: value.trim(), resultCount });
+            }, 500);
+        }
+    };
+
+    // Filter toggle handler for page 4
+    const handleFilterToggle = (level) => {
+        setExposureFilters(prev => {
+            const next = new Set(prev);
+            if (next.has(level)) {
+                next.delete(level);
+                logSearchEvent('filter_off', { filter: level });
+            } else {
+                next.add(level);
+                logSearchEvent('filter_on', { filter: level });
+            }
+            return next;
+        });
+    };
+
+    // Scroll tracking for page 4 occupation list
+    const handleSearchListScroll = (e) => {
+        const { scrollTop, scrollHeight, clientHeight } = e.target;
+        if (scrollHeight - clientHeight > 0) {
+            const pct = Math.round((scrollTop / (scrollHeight - clientHeight)) * 100);
+            if (pct > maxScrollRef.current) maxScrollRef.current = pct;
+        }
     };
 
     // Define top 3 positive and negative occupations based on rankings from CSV
@@ -1086,10 +1191,32 @@ function AIExposureVisualization() {
 
     // Function to get search screen tracking data (can be called from parent via postMessage)
     const getSearchScreenTrackingData = () => {
+        // Compute deduplicated occupations from event log
+        const occMap = {};
+        searchScreenEvents.current.forEach(evt => {
+            if (evt.type === 'click_occupation') {
+                if (!occMap[evt.occupation]) {
+                    occMap[evt.occupation] = { name: evt.occupation, soc_code: evt.soc_code, ranking: evt.ranking, viewCount: 0, totalViewSeconds: 0 };
+                }
+                occMap[evt.occupation].viewCount++;
+            } else if (evt.type === 'close_occupation' && evt.viewDurationSeconds != null && occMap[evt.occupation]) {
+                occMap[evt.occupation].totalViewSeconds += evt.viewDurationSeconds;
+            }
+        });
+
+        const totalTimeSeconds = searchScreenStartTime.current
+            ? parseFloat(((Date.now() - searchScreenStartTime.current) / 1000).toFixed(1))
+            : searchScreenTotalTime;
+
         return {
-            totalTimeSeconds: searchScreenTotalTime,
+            totalTimeSeconds,
             occupationsViewed: searchScreenOccupationsViewed,
-            searchTermsUsed: searchTerms
+            searchTermsUsed: searchTerms,
+            events: searchScreenEvents.current,
+            occupationsViewedDetailed: Object.values(occMap),
+            searchTerms: searchScreenEvents.current.filter(e => e.type === 'search').map(e => e.term),
+            filtersUsed: searchScreenEvents.current.filter(e => e.type.startsWith('filter_')),
+            maxScrollPercent: maxScrollRef.current
         };
     };
 
@@ -1114,6 +1241,39 @@ function AIExposureVisualization() {
     // Apply search filter
     if (searchTerm) {
         data = data.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }
+
+    // Apply filters (only active on page 4: !showSearch && !ranked && !showTop)
+    if (!showSearch && !ranked && !showTop) {
+        if (exposureFilters.size > 0) {
+            data = data.filter(item => {
+                const r = item.ranking || getRanking(item.name);
+                const level = getExposureLevel(r).level;
+                return exposureFilters.has(level);
+            });
+        }
+        if (occGroupFilter) {
+            data = data.filter(item => item.soc_code && item.soc_code.startsWith(occGroupFilter + '-'));
+        }
+        if (educationFilter === 'college') {
+            data = data.filter(item => {
+                const edu = (item.educationcode || '').toLowerCase();
+                return edu.includes('bachelor') || edu.includes('master') || edu.includes('doctoral') || edu.includes('professional');
+            });
+        } else if (educationFilter === 'nocollege') {
+            data = data.filter(item => {
+                const edu = (item.educationcode || '').toLowerCase();
+                return !(edu.includes('bachelor') || edu.includes('master') || edu.includes('doctoral') || edu.includes('professional'));
+            });
+        }
+        if (fieldOfStudyFilter) {
+            const filterLower = fieldOfStudyFilter.toLowerCase();
+            data = data.filter(item =>
+                [item.degfield_1, item.degfield_2, item.degfield_3].some(f =>
+                    f && f.trim().toLowerCase() === filterLower
+                )
+            );
+        }
     }
 
     // Handles item selection
@@ -1156,6 +1316,14 @@ function AIExposureVisualization() {
     const handleItemClickEnd = (item) => {
         if (selectedItemEnd) {
             updateTimeSpentDetail(selectedItemEnd.id, timeSpent - timeSpentDetailStart);
+            // Log close event with duration
+            if (detailOpenTimeRef.current) {
+                logSearchEvent('close_occupation', {
+                    occupation: selectedItemEnd.name,
+                    viewDurationSeconds: parseFloat(((Date.now() - detailOpenTimeRef.current) / 1000).toFixed(1))
+                });
+                detailOpenTimeRef.current = null;
+            }
         }
         if ((selectedItemEnd && selectedItemEnd !== item) || !selectedItemEnd) {
             item.count++;
@@ -1167,8 +1335,19 @@ function AIExposureVisualization() {
                 setSearchTerms(searchTerms + ', ' + searchTerm);
             }
         }
-        setSelectedItemEnd(selectedItemEnd?.name === item.name ? null : item);
+        const isClosing = selectedItemEnd?.name === item.name;
+        setSelectedItemEnd(isClosing ? null : item);
         setTimeSpentDetailStart(timeSpent);
+
+        if (!isClosing) {
+            // Log click event for opening a new occupation
+            logSearchEvent('click_occupation', {
+                occupation: item.name,
+                soc_code: item.soc_code,
+                ranking: item.ranking || getRanking(item.name)
+            });
+            detailOpenTimeRef.current = Date.now();
+        }
 
         // Track occupation viewed on search screen (only add if not already tracked)
         if (!searchScreenOccupationsViewed.find(o => o.name === item.name)) {
@@ -1213,6 +1392,23 @@ function AIExposureVisualization() {
         setSelectedItemEnd(null);
         updateTimeSpentPages(page_num, timeSpent);
         setTimeSpent(0);
+        // Show transition screen before page 4
+        if (!show_top) {
+            setShowTransition(true);
+        }
+    };
+
+    // Handles user clicking continue on the transition screen
+    const handleTransitionContinue = () => {
+        setShowTransition(false);
+        searchScreenStartTime.current = Date.now();
+        setSearchScreenTimeStart(Date.now());
+        searchScreenEvents.current = [];
+        maxScrollRef.current = 0;
+        setExposureFilters(new Set());
+        setOccGroupFilter('');
+        setEducationFilter('');
+        setFieldOfStudyFilter('');
     };
 
     // Handles user clicking back button
@@ -1241,12 +1437,57 @@ function AIExposureVisualization() {
         setShowEnd(true);
         if (selectedItemEnd) {
             updateTimeSpentDetail(selectedItemEnd.id, timeSpent - timeSpentDetailStart);
+            // Close any open detail panel and log duration
+            if (detailOpenTimeRef.current) {
+                logSearchEvent('close_occupation', {
+                    occupation: selectedItemEnd.name,
+                    viewDurationSeconds: parseFloat(((Date.now() - detailOpenTimeRef.current) / 1000).toFixed(1))
+                });
+                detailOpenTimeRef.current = null;
+            }
         }
         setSelectedItemEnd(null);
         updateTimeSpentPages(3, timeSpent);
-        // Start tracking time for search screen
-        setSearchScreenTimeStart(Date.now());
         setTimeSpent(0);
+
+        // Compute total time on search screen
+        const totalTimeSeconds = searchScreenStartTime.current
+            ? parseFloat(((Date.now() - searchScreenStartTime.current) / 1000).toFixed(1))
+            : 0;
+
+        // Log max scroll
+        logSearchEvent('end', { maxScrollPercent: maxScrollRef.current });
+
+        // Build deduplicated occupationsViewed with view counts and durations from events
+        const occMap = {};
+        const openTimes = {};
+        searchScreenEvents.current.forEach(evt => {
+            if (evt.type === 'click_occupation') {
+                if (!occMap[evt.occupation]) {
+                    occMap[evt.occupation] = { name: evt.occupation, soc_code: evt.soc_code, ranking: evt.ranking, viewCount: 0, totalViewSeconds: 0 };
+                }
+                occMap[evt.occupation].viewCount++;
+                openTimes[evt.occupation] = evt.time;
+            } else if (evt.type === 'close_occupation' && evt.viewDurationSeconds != null) {
+                if (occMap[evt.occupation]) {
+                    occMap[evt.occupation].totalViewSeconds += evt.viewDurationSeconds;
+                }
+            }
+        });
+
+        // Send comprehensive tracking data
+        window.parent.postMessage({
+            type: 'searchScreenTracking',
+            data: {
+                events: searchScreenEvents.current,
+                totalTimeSeconds,
+                occupationsViewed: Object.values(occMap),
+                searchTerms: searchScreenEvents.current.filter(e => e.type === 'search').map(e => e.term),
+                filtersUsed: searchScreenEvents.current.filter(e => e.type.startsWith('filter_')),
+                maxScrollPercent: maxScrollRef.current
+            }
+        }, '*');
+
         window.parent.postMessage("showNextButton", "*");
     };
 
@@ -1302,7 +1543,7 @@ function AIExposureVisualization() {
             }}>Exploring the Impact of Artificial Intelligence (AI)</h1>
 
             {/* Displays additional header for the first page */}
-            {showSearch && (
+            {showSearch && !preselectedOccupations && (
                 <p style={{
                     textAlign: 'center',
                     marginBottom: '30px',
@@ -1312,6 +1553,16 @@ function AIExposureVisualization() {
                     Please select the 6 occupations you previously entered. Use the search bar below to find and click on each occupation to add it to your list.
                     <br />
                     As a reminder, these are the top 6 occupations you would consider for your future career.
+                </p>
+            )}
+            {showSearch && preselectedOccupations && (
+                <p style={{
+                    textAlign: 'center',
+                    marginBottom: '30px',
+                    color: 'black',
+                    lineHeight: '1.6'
+                }}>
+                    These are the occupations you listed:
                 </p>
             )}
 
@@ -1327,7 +1578,60 @@ function AIExposureVisualization() {
             )}
 
             {/* Displays the first page */}
-            {showSearch && (
+            {showSearch && preselectedOccupations && (
+                <div style={{
+                    backgroundColor: 'white',
+                    padding: '20px',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                    marginBottom: '30px'
+                }}>
+                    <ol style={{ paddingLeft: '20px', marginBottom: '20px', lineHeight: '2', fontSize: '1rem' }}>
+                        {preselectedOccupations.map((item, idx) => (
+                            <li key={idx} style={{
+                                color: item.match ? '#222' : '#9ca3af'
+                            }}>
+                                {item.match ? item.match.name : item.typed}
+                                {!item.match && (
+                                    <span style={{ fontSize: '0.85rem', marginLeft: '8px', fontStyle: 'italic' }}>
+                                        (not found in database)
+                                    </span>
+                                )}
+                            </li>
+                        ))}
+                    </ol>
+                    <button
+                        onClick={() => {
+                            const matchedItems = preselectedOccupations
+                                .filter(item => item.match)
+                                .map(item => item.match);
+                            setList(matchedItems);
+                            // Directly replicate handleSubmit logic since list state won't update until next render
+                            setRanked([...matchedItems]);
+                            setShowSearch(false);
+                            updateTimeSpentPages(0, timeSpent);
+                            setTimeSpent(0);
+                            setSearchTerm('');
+                        }}
+                        disabled={preselectedOccupations.filter(item => item.match).length === 0}
+                        style={{
+                            cursor: 'pointer',
+                            padding: '10px 24px',
+                            fontSize: '1rem',
+                            fontWeight: '600',
+                            backgroundColor: '#2563eb',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            display: 'block',
+                            margin: '0 auto'
+                        }}
+                    >
+                        Confirm
+                    </button>
+                </div>
+            )}
+            {showSearch && !preselectedOccupations && (
                 <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -1556,14 +1860,25 @@ function AIExposureVisualization() {
                                                             const selectedQuintile = getExposureQuintile(ranking);
                                                             const selectedMeta = QUINTILE_META[selectedQuintile];
                                                             const selectedChange = employmentChangeByQuintile?.[selectedQuintile];
+                                                            const quintileExplanation =
+                                                                selectedMeta.textLabel === 'very high' ? 'This means most of the tasks in this occupation can be done or helped by AI.'
+                                                                : selectedMeta.textLabel === 'high' ? 'This means many of the tasks in this occupation can be done or helped by AI.'
+                                                                : selectedMeta.textLabel === 'moderate' ? 'This means some of the tasks in this occupation can be done or helped by AI.'
+                                                                : selectedMeta.textLabel === 'low' ? 'This means few of the tasks in this occupation can currently be done by AI.'
+                                                                : 'This means very few of the tasks in this occupation can currently be done by AI.';
 
                                                             return (
-                                                                <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
-                                                                    Workers in <strong>{selectedItem.name}</strong> have{' '}
-                                                                    <strong style={{ color: getEmploymentColor(selectedChange) }}>
-                                                                        {selectedMeta.textLabel}
-                                                                    </strong> AI exposure.
-                                                                </p>
+                                                                <>
+                                                                    <p style={{ marginBottom: '4px', lineHeight: '1.5', color: 'black' }}>
+                                                                        Workers in <strong>{selectedItem.name}</strong> have{' '}
+                                                                        <strong style={{ color: getEmploymentColor(selectedChange) }}>
+                                                                            {selectedMeta.textLabel}
+                                                                        </strong> AI exposure.
+                                                                    </p>
+                                                                    <p style={{ marginBottom: '10px', lineHeight: '1.5', color: '#334155' }}>
+                                                                        {quintileExplanation}
+                                                                    </p>
+                                                                </>
                                                             );
                                                         })()}
 
@@ -1857,8 +2172,44 @@ function AIExposureVisualization() {
                 </>
             )}
 
+            {/* Transition screen before page 4 */}
+            {showTransition && !showSearch && !ranked && !showTop && !showEnd && (
+                <div style={{
+                    backgroundColor: 'white',
+                    padding: '30px',
+                    borderRadius: '8px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                    marginBottom: '30px',
+                    textAlign: 'center'
+                }}>
+                    <p style={{
+                        fontSize: '1.1rem',
+                        lineHeight: '1.6',
+                        color: '#334155',
+                        marginBottom: '24px'
+                    }}>
+                        Next, you will be able to explore and learn more about any occupation you are interested in.
+                    </p>
+                    <button
+                        onClick={handleTransitionContinue}
+                        style={{
+                            cursor: 'pointer',
+                            padding: '10px 24px',
+                            fontSize: '1rem',
+                            fontWeight: '600',
+                            backgroundColor: '#2563eb',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px'
+                        }}
+                    >
+                        Continue
+                    </button>
+                </div>
+            )}
+
             {/* Displays the fourth page */}
-            {!showTop && !ranked && !showSearch && !showEnd && (
+            {!showTransition && !showTop && !ranked && !showSearch && !showEnd && (
                 <>
                     <div style={{
                         display: 'grid',
@@ -1895,11 +2246,131 @@ function AIExposureVisualization() {
                         }}>
                             Please click on an occupation to view more information about it.
                         </label>
+
+                        {/* Exposure-level filter buttons */}
+                        <div style={{
+                            display: 'flex',
+                            gap: '8px',
+                            marginBottom: '10px',
+                            flexWrap: 'wrap'
+                        }}>
+                            {[
+                                { level: 'Very High', color: '#dc2626' },
+                                { level: 'High', color: '#f97316' },
+                                { level: 'Moderate', color: '#eab308' },
+                                { level: 'Low', color: '#22c55e' },
+                                { level: 'Very Low', color: '#16a34a' }
+                            ].map(({ level, color }) => {
+                                const isActive = exposureFilters.has(level);
+                                return (
+                                    <button
+                                        key={level}
+                                        onClick={() => handleFilterToggle(level)}
+                                        style={{
+                                            padding: '5px 12px',
+                                            borderRadius: '16px',
+                                            border: `2px solid ${color}`,
+                                            backgroundColor: isActive ? color : 'white',
+                                            color: isActive ? 'white' : color,
+                                            fontWeight: '600',
+                                            fontSize: '12px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        {level}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Additional filters row */}
+                        <div style={{
+                            display: 'flex',
+                            gap: '12px',
+                            marginBottom: '10px',
+                            flexWrap: 'wrap',
+                            alignItems: 'center'
+                        }}>
+                            {/* Field of study dropdown */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: '600', color: '#334155' }}>
+                                    Field of study:
+                                </label>
+                                <select
+                                    value={fieldOfStudyFilter}
+                                    onChange={(e) => setFieldOfStudyFilter(e.target.value)}
+                                    style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '6px',
+                                        border: '1px solid #d1d5db',
+                                        fontSize: '12px',
+                                        color: '#334155',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <option value="">All fields</option>
+                                    {allDegreeFields.map(f => (
+                                        <option key={f} value={f.toLowerCase()}>{f}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Education filter */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: '600', color: '#334155' }}>
+                                    Typical education:
+                                </label>
+                                <select
+                                    value={educationFilter}
+                                    onChange={(e) => setEducationFilter(e.target.value)}
+                                    style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '6px',
+                                        border: '1px solid #d1d5db',
+                                        fontSize: '12px',
+                                        color: '#334155',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <option value="">All education levels</option>
+                                    <option value="college">College degree (bachelor's or higher)</option>
+                                    <option value="nocollege">Less than a bachelor's degree</option>
+                                </select>
+                            </div>
+
+                            {/* Occupation group dropdown */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <label style={{ fontSize: '12px', fontWeight: '600', color: '#334155' }}>
+                                    Occupation group:
+                                </label>
+                                <select
+                                    value={occGroupFilter}
+                                    onChange={(e) => setOccGroupFilter(e.target.value)}
+                                    style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '6px',
+                                        border: '1px solid #d1d5db',
+                                        fontSize: '12px',
+                                        color: '#334155',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <option value="">All groups</option>
+                                    {mockData.occupations.map(o => (
+                                        <option key={o.two_digit_soc_code} value={String(o.two_digit_soc_code)}>
+                                            {o.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
                         <div style={{ position: 'relative' }}>
                             <input
                                 type="text"
                                 placeholder='Search for occupations'
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={handleSearchInputChange}
                                 style={{
                                     width: '100%',
                                     padding: '10px 10px 10px 35px',
@@ -1920,10 +2391,13 @@ function AIExposureVisualization() {
                                 🔍
                             </div>
                         </div>
-                        <div style={{
-                            height: '250px',
-                            overflowY: 'scroll'
-                        }}>
+                        <div
+                            onScroll={handleSearchListScroll}
+                            style={{
+                                height: '250px',
+                                overflowY: 'scroll'
+                            }}
+                        >
                             {data.map((item, index) => (
                                 <div
                                     key={index}
@@ -2063,7 +2537,7 @@ function AIExposureVisualization() {
             )}
 
             {/* Displays back and end buttons */}
-            {!showTop && !ranked && !showSearch && !showEnd && (
+            {!showTransition && !showTop && !ranked && !showSearch && !showEnd && (
                 <div style={{ paddingBottom: '20px' }}>
                     <div>
                         <button
