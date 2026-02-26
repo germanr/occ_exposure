@@ -113,6 +113,21 @@ function getEmploymentBadgeStyle(value) {
     };
 }
 
+function getExposureBadgeStyle(ranking) {
+    const styles = {
+        display: 'inline-block',
+        padding: '2px 8px',
+        borderRadius: '999px',
+        fontWeight: '600',
+        fontSize: '12px',
+    };
+    if (ranking <= 20) return { ...styles, backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5' };
+    if (ranking <= 40) return { ...styles, backgroundColor: '#ffedd5', color: '#9a3412', border: '1px solid #fdba74' };
+    if (ranking <= 60) return { ...styles, backgroundColor: '#fef9c3', color: '#854d0e', border: '1px solid #fde047' };
+    if (ranking <= 80) return { ...styles, backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac' };
+    return { ...styles, backgroundColor: '#bbf7d0', color: '#14532d', border: '1px solid #4ade80' };
+}
+
 function computeEmploymentChangeByQuintile(headcountData) {
     const overall = headcountData?.overall_usage;
     if (!overall?.dates || !overall?.quintiles) return null;
@@ -1838,7 +1853,7 @@ function AIExposureVisualization() {
                                                     <span>
                                                         {index + 1}. {item.name}
                                                     </span>
-                                                    <span style={getEmploymentBadgeStyle(quintileEmploymentChange)}>
+                                                    <span style={getExposureBadgeStyle(ranking)}>
                                                         {quintileMeta.title} exposure
                                                     </span>
                                                 </button>
@@ -1899,11 +1914,10 @@ function AIExposureVisualization() {
                                                                         {relatedOccs.map(occ => {
                                                                             const similarQuintile = getExposureQuintile(occ.ranking);
                                                                             const similarMeta = QUINTILE_META[similarQuintile];
-                                                                            const similarChange = employmentChangeByQuintile?.[similarQuintile];
                                                                             return (
                                                                                 <li key={occ.soc_code}>
                                                                                     <strong>{occ.name}</strong>:{' '}
-                                                                                    <span style={getEmploymentBadgeStyle(similarChange)}>
+                                                                                    <span style={getExposureBadgeStyle(occ.ranking)}>
                                                                                         {similarMeta.title} exposure
                                                                                     </span>
                                                                                 </li>
@@ -2116,11 +2130,10 @@ function AIExposureVisualization() {
                                                             {relatedOccs.map(occ => {
                                                                 const similarQuintile = getExposureQuintile(occ.ranking);
                                                                 const similarMeta = QUINTILE_META[similarQuintile];
-                                                                const similarChange = employmentChangeByQuintile?.[similarQuintile];
                                                                 return (
                                                                     <li key={occ.soc_code}>
                                                                         <strong>{occ.name}</strong>:{' '}
-                                                                        <span style={getEmploymentBadgeStyle(similarChange)}>
+                                                                        <span style={getExposureBadgeStyle(occ.ranking)}>
                                                                             {similarMeta.title} exposure
                                                                         </span>
                                                                     </li>
