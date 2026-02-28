@@ -629,7 +629,6 @@ function EmploymentChangeChart({
         }}>
             <ul style={{ marginTop: '8px', marginBottom: '10px', paddingLeft: '20px', lineHeight: '1.5', color: '#334155' }}>
                 <li>The chart shows how employment for young workers has changed since the release of ChatGPT.</li>
-                <li>The arrows with occupation names point to each relevant AI exposure group.</li>
             </ul>
 
             <svg viewBox={`0 0 760 ${svgHeight}`} style={{ width: '100%', height: 'auto' }}>
@@ -788,29 +787,6 @@ function EmploymentChangeChart({
                     Employment Change
                 </text>
             </svg>
-
-            <div style={{ marginBottom: '10px', lineHeight: '1.5', color: '#334155' }}>
-                <p style={{ margin: 0 }}>
-                    Your {occupationDescriptor} occupation was <strong>{occupationName}</strong>.
-                </p>
-                <ul style={{ margin: '6px 0 0 0', paddingLeft: '20px' }}>
-                    <li>
-                        Workers in this occupation are in the{' '}
-                        <strong style={{ color: participantBarColor }}>{participantMeta.textLabel}</strong>{' '}
-                        AI exposure category.
-                    </li>
-                    <li>
-                        Group with this AI exposure has historically experienced{' '}
-                        <strong style={{ color: participantBarColor }}>{formatAbsPercent(participantValue)}</strong>{' '}
-                        {direction} in employment since the release of ChatGPT in November 2022.
-                    </li>
-                    <li>
-                        {participantValue >= 0
-                            ? `That means roughly ${participantWorkers} jobs were added for every 100 workers.`
-                            : `That means roughly ${participantWorkers} out of every 100 workers in this group lost their jobs.`}
-                    </li>
-                </ul>
-            </div>
 
             {showExposureGuide && (
                 <div style={{
@@ -1881,18 +1857,35 @@ function AIExposureVisualization() {
                                                                 : selectedMeta.textLabel === 'moderate' ? 'This means some of the tasks in this occupation can be done or helped by AI.'
                                                                 : selectedMeta.textLabel === 'low' ? 'This means few of the tasks in this occupation can currently be done by AI.'
                                                                 : 'This means very few of the tasks in this occupation can currently be done by AI.';
+                                                            const direction = selectedChange >= 0 ? 'growth' : 'decline';
+                                                            const workers = Math.round(Math.abs(selectedChange));
+                                                            const workersText = selectedChange >= 0
+                                                                ? `That means roughly ${workers} jobs were added for every 100 workers.`
+                                                                : `That means roughly ${workers} out of every 100 workers in this group lost their jobs.`;
 
                                                             return (
                                                                 <>
                                                                     <p style={{ marginBottom: '4px', lineHeight: '1.5', color: 'black' }}>
-                                                                        Workers in <strong>{selectedItem.name}</strong> have{' '}
+                                                                        The <strong>{selectedItem.name}</strong> occupation has{' '}
                                                                         <strong style={{ color: getEmploymentColor(selectedChange) }}>
                                                                             {selectedMeta.textLabel}
-                                                                        </strong> AI exposure.
-                                                                    </p>
-                                                                    <p style={{ marginBottom: '10px', lineHeight: '1.5', color: '#334155' }}>
+                                                                        </strong> AI exposure.{' '}
                                                                         {quintileExplanation}
                                                                     </p>
+                                                                    {Number.isFinite(selectedChange) && (
+                                                                        <p style={{ marginBottom: '4px', lineHeight: '1.5', color: 'black' }}>
+                                                                            Occupations with {selectedMeta.textLabel} AI exposure have experienced{' '}
+                                                                            <strong style={{ color: getEmploymentColor(selectedChange) }}>
+                                                                                {formatAbsPercent(selectedChange)}
+                                                                            </strong>{' '}
+                                                                            {direction} in employment since the release of ChatGPT in November 2022.
+                                                                        </p>
+                                                                    )}
+                                                                    {Number.isFinite(selectedChange) && (
+                                                                        <p style={{ marginBottom: '10px', lineHeight: '1.5', color: '#334155' }}>
+                                                                            {workersText}
+                                                                        </p>
+                                                                    )}
                                                                 </>
                                                             );
                                                         })()}
@@ -1906,9 +1899,6 @@ function AIExposureVisualization() {
                                                                 <>
                                                                     <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
                                                                         <strong>Occupations similar to {selectedItem.name} are shown below.</strong>
-                                                                    </p>
-                                                                    <p style={{ lineHeight: '1.5', color: '#334155', marginTop: '6px', marginBottom: '8px', fontSize: '13px' }}>
-                                                                        Color follows the employment chart: green groups have growth and red groups have decline.
                                                                     </p>
                                                                     <ol style={{ paddingLeft: '20px', marginBottom: '15px', lineHeight: '1.8', color: 'black' }}>
                                                                         {relatedOccs.map(occ => {
@@ -2106,12 +2096,38 @@ function AIExposureVisualization() {
                                     const selectedQuintile = getExposureQuintile(ranking);
                                     const selectedMeta = QUINTILE_META[selectedQuintile];
                                     const selectedChange = employmentChangeByQuintile?.[selectedQuintile];
+                                    const quintileExplanation =
+                                        selectedMeta.textLabel === 'very high' ? 'This means most of the tasks in this occupation can be done or helped by AI.'
+                                        : selectedMeta.textLabel === 'high' ? 'This means many of the tasks in this occupation can be done or helped by AI.'
+                                        : selectedMeta.textLabel === 'moderate' ? 'This means some of the tasks in this occupation can be done or helped by AI.'
+                                        : selectedMeta.textLabel === 'low' ? 'This means few of the tasks in this occupation can currently be done by AI.'
+                                        : 'This means very few of the tasks in this occupation can currently be done by AI.';
+                                    const direction = selectedChange >= 0 ? 'growth' : 'decline';
+                                    const workers = Math.round(Math.abs(selectedChange));
+                                    const workersText = selectedChange >= 0
+                                        ? `That means roughly ${workers} jobs were added for every 100 workers.`
+                                        : `That means roughly ${workers} out of every 100 workers in this group lost their jobs.`;
                                     return (
                                         <>
-                                            <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
-                                                Workers in <strong>{selectedItem.name}</strong> have{' '}
-                                                <strong style={{ color: getEmploymentColor(selectedChange) }}>{selectedMeta.textLabel}</strong> AI exposure.
+                                            <p style={{ marginBottom: '4px', lineHeight: '1.5', color: 'black' }}>
+                                                The <strong>{selectedItem.name}</strong> occupation has{' '}
+                                                <strong style={{ color: getEmploymentColor(selectedChange) }}>{selectedMeta.textLabel}</strong> AI exposure.{' '}
+                                                {quintileExplanation}
                                             </p>
+                                            {Number.isFinite(selectedChange) && (
+                                                <p style={{ marginBottom: '4px', lineHeight: '1.5', color: 'black' }}>
+                                                    Occupations with {selectedMeta.textLabel} AI exposure have experienced{' '}
+                                                    <strong style={{ color: getEmploymentColor(selectedChange) }}>
+                                                        {formatAbsPercent(selectedChange)}
+                                                    </strong>{' '}
+                                                    {direction} in employment since the release of ChatGPT in November 2022.
+                                                </p>
+                                            )}
+                                            {Number.isFinite(selectedChange) && (
+                                                <p style={{ marginBottom: '10px', lineHeight: '1.5', color: '#334155' }}>
+                                                    {workersText}
+                                                </p>
+                                            )}
 
                                             {(() => {
                                                 const relatedOccs = [selectedItem.related_soc_code_1, selectedItem.related_soc_code_2, selectedItem.related_soc_code_3]
@@ -2122,9 +2138,6 @@ function AIExposureVisualization() {
                                                     <>
                                                         <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
                                                             <strong>Occupations similar to {selectedItem.name} are shown below.</strong>
-                                                        </p>
-                                                        <p style={{ lineHeight: '1.5', color: '#334155', marginTop: '6px', marginBottom: '8px', fontSize: '13px' }}>
-                                                            Color follows the employment chart: green groups have growth and red groups have decline.
                                                         </p>
                                                         <ol style={{ paddingLeft: '20px', marginBottom: '15px', lineHeight: '1.8', color: 'black' }}>
                                                             {relatedOccs.map(occ => {
@@ -2201,7 +2214,7 @@ function AIExposureVisualization() {
                         color: '#334155',
                         marginBottom: '12px'
                     }}>
-                        Next, you will be able to explore and learn more about any occupation you are interested in.
+                        Next, you will be able to explore and learn more about any occupation you are interested in. This can include occupations that are not among the top 6 you previously listed.
                     </p>
                     <p style={{
                         fontSize: '0.95rem',
@@ -2209,7 +2222,7 @@ function AIExposureVisualization() {
                         color: '#475569',
                         marginBottom: '24px'
                     }}>
-                        You can search for specific occupations by name, or use filters to narrow the list by field of study, typical education level, occupation group, or AI exposure level.
+                        You can search for specific occupations by name, or use filters to narrow the list by AI exposure level, field of study, education level, or occupation group.
                     </p>
                     <button
                         onClick={handleTransitionContinue}
@@ -2244,9 +2257,7 @@ function AIExposureVisualization() {
                             borderRadius: '8px',
                             boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
                         }}>
-                            <p>In the search bar below, enter occupations you would like
-                                to find out more information about.
-                            </p>
+                            <p>You can search for specific occupations by name, or use filters to narrow the list by AI exposure level, field of study, education level, or occupation group.</p>
                         </div>
                     </div>
 
@@ -2506,7 +2517,7 @@ function AIExposureVisualization() {
                             borderRadius: '8px',
                             boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
                         }}>
-                            <p>Thank you for completing this portion of the survey. Please click Next at the bottom right of the page to continue the survey.</p>
+                            <p>Thank you for completing this portion of the survey. Please click &gt; at the bottom right of the page to continue the survey. You may need to scroll all the way to the bottom of the survey screen to see it.</p>
                         </div>
                     </div>
                 </>
