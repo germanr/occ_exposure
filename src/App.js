@@ -2476,17 +2476,105 @@ function AIExposureVisualization() {
                                     border: '1px solid #bfdbfe'
                                 }}>
                                     <h4 style={{ marginBottom: '10px', fontWeight: 'bold', color: '#1e40af' }}>
-                                        More Detailed Information
+                                        Detailed Information
                                     </h4>
-                                    <p style={{ marginBottom: '10px', lineHeight: '1.5', color: 'black' }}>
-                                        Workers in <strong>{selectedItemEnd.name}</strong> have{' '}
-                                        <strong style={{ color: getEmploymentColor(selectedChange) }}>{selectedMeta.textLabel}</strong> AI exposure.
-                                    </p>
-                                    {selectedMeta.explanation && (
-                                        <p style={{ marginBottom: 0, lineHeight: '1.5', color: '#334155' }}>
-                                            {selectedMeta.explanation}
-                                        </p>
-                                    )}
+                                    {(() => {
+                                        const quintileExplanation =
+                                            selectedMeta.textLabel === 'very high' ? 'This means most of the tasks in this occupation can be done or helped by AI.'
+                                            : selectedMeta.textLabel === 'high' ? 'This means many of the tasks in this occupation can be done or helped by AI.'
+                                            : selectedMeta.textLabel === 'moderate' ? 'This means some of the tasks in this occupation can be done or helped by AI.'
+                                            : selectedMeta.textLabel === 'low' ? 'This means few of the tasks in this occupation can currently be done by AI.'
+                                            : 'This means very few of the tasks in this occupation can currently be done by AI.';
+                                        const direction = selectedChange >= 0 ? 'growth' : 'decline';
+                                        const workers = Math.round(Math.abs(selectedChange));
+                                        const workersText = selectedChange >= 0
+                                            ? `That means roughly ${workers} jobs were added for every 100 workers.`
+                                            : `That means roughly ${workers} out of every 100 workers in this group lost their jobs.`;
+                                        return (
+                                            <>
+                                                <p style={{ marginBottom: '4px', lineHeight: '1.5', color: 'black' }}>
+                                                    The <strong>{selectedItemEnd.name}</strong> occupation has{' '}
+                                                    <strong style={{ color: getEmploymentColor(selectedChange) }}>{selectedMeta.textLabel}</strong> AI exposure.{' '}
+                                                    {quintileExplanation}
+                                                </p>
+                                                {Number.isFinite(selectedChange) && (
+                                                    <p style={{ marginBottom: '4px', lineHeight: '1.5', color: 'black' }}>
+                                                        Occupations with {selectedMeta.textLabel} AI exposure have experienced{' '}
+                                                        <strong style={{ color: getEmploymentColor(selectedChange) }}>
+                                                            {formatAbsPercent(selectedChange)}
+                                                        </strong>{' '}
+                                                        {direction} in employment since the release of ChatGPT in November 2022.
+                                                    </p>
+                                                )}
+                                                {Number.isFinite(selectedChange) && (
+                                                    <p style={{ marginBottom: '10px', lineHeight: '1.5', color: '#334155' }}>
+                                                        {workersText}
+                                                    </p>
+                                                )}
+
+                                                {(() => {
+                                                    const relatedOccs = [selectedItemEnd.related_soc_code_1, selectedItemEnd.related_soc_code_2, selectedItemEnd.related_soc_code_3]
+                                                        .filter(Boolean)
+                                                        .map(code => socCodeMap[code])
+                                                        .filter(Boolean);
+                                                    return relatedOccs.length > 0 ? (
+                                                        <>
+                                                            <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
+                                                                <strong>Occupations similar to {selectedItemEnd.name} are shown below.</strong>
+                                                            </p>
+                                                            <ol style={{ paddingLeft: '20px', marginBottom: '15px', lineHeight: '1.8', color: 'black' }}>
+                                                                {relatedOccs.map(occ => {
+                                                                    const similarQuintile = getExposureQuintile(occ.ranking);
+                                                                    const similarMeta = QUINTILE_META[similarQuintile];
+                                                                    return (
+                                                                        <li key={occ.soc_code}>
+                                                                            <strong>{occ.name}</strong>:{' '}
+                                                                            <span style={getExposureBadgeStyle(occ.ranking)}>
+                                                                                {similarMeta.title} exposure
+                                                                            </span>
+                                                                        </li>
+                                                                    );
+                                                                })}
+                                                            </ol>
+                                                        </>
+                                                    ) : null;
+                                                })()}
+
+                                                {(() => {
+                                                    const relatedOccs = [selectedItemEnd.related_soc_code_1, selectedItemEnd.related_soc_code_2, selectedItemEnd.related_soc_code_3]
+                                                        .filter(Boolean)
+                                                        .map(code => socCodeMap[code])
+                                                        .filter(Boolean);
+                                                    const allOccs = [selectedItemEnd, ...relatedOccs];
+                                                    return (
+                                                        <>
+                                                            <p style={{ lineHeight: '1.5', color: 'black', marginTop: '15px' }}>
+                                                                <strong>Relevant areas of study</strong>
+                                                            </p>
+                                                            <ul style={{ paddingLeft: '20px', marginBottom: '10px', lineHeight: '1.8', color: 'black' }}>
+                                                                {allOccs.map(occ => {
+                                                                    const edu = formatEducation(occ.educationcode);
+                                                                    const degFields = [occ.degfield_1, occ.degfield_2, occ.degfield_3]
+                                                                        .filter(Boolean)
+                                                                        .map(capitalizeField);
+                                                                    return (
+                                                                        <li key={occ.soc_code || occ.name}>
+                                                                            {occ.name}: {edu.hasBachelors
+                                                                                        ? 'The majority of workers in this occupation hold at least a college (bachelor\'s) degree.'
+                                                                                        : 'The majority of workers in this occupation have less than a college (bachelor\'s) degree.'}
+                                                                            {edu.hasBachelors && degFields.length > 0 && (
+                                                                                <> Workers typically study <strong>{listFormatter.format(degFields)}</strong>.</>
+                                                                            )}
+                                                                        </li>
+                                                                    );
+                                                                })}
+                                                            </ul>
+                                                        </>
+                                                    );
+                                                })()}
+                                            </>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         );
