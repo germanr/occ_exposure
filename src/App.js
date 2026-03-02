@@ -2212,17 +2212,9 @@ function AIExposureVisualization() {
                         fontSize: '1.1rem',
                         lineHeight: '1.6',
                         color: '#334155',
-                        marginBottom: '12px'
-                    }}>
-                        Next, you will be able to explore and learn more about any occupation you are interested in. This can include occupations that are not among the top 6 you previously listed.
-                    </p>
-                    <p style={{
-                        fontSize: '0.95rem',
-                        lineHeight: '1.6',
-                        color: '#475569',
                         marginBottom: '24px'
                     }}>
-                        You can search for specific occupations by name, or use filters to narrow the list by AI exposure level, field of study, education level, or occupation group.
+                        Next, you will be able to explore and learn more about any occupation you are interested in. This can include occupations that are not among the top 6 you previously listed.
                     </p>
                     <button
                         onClick={handleTransitionContinue}
