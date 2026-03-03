@@ -22,18 +22,13 @@ import React, { useState, useEffect, useRef } from 'react';
 const CSV_URL = process.env.PUBLIC_URL + '/aei_exposure_6digit.csv';
 const EMPLOYMENT_DATA_URL = process.env.PUBLIC_URL + '/headcount_data.json';
 const CHATGPT_RELEASE_DATE = '2022-11-01';
-const QUINTILE_ORDER = [1, 2, 3, 4, 5]; // 1 = least exposed, 5 = most exposed
+const QUINTILE_ORDER = [1, 3, 4, 5]; // 1 = least exposed, 5 = most exposed
 
 const QUINTILE_META = {
     1: {
-        title: 'Very Low',
-        textLabel: 'very low',
+        title: 'Lowest',
+        textLabel: 'lowest',
         explanation: 'These occupations rely on tasks AI currently struggles with, for example physical, hands-on, or highly context-specific work.',
-    },
-    2: {
-        title: 'Low',
-        textLabel: 'low',
-        explanation: 'These occupations have some exposure to AI tools, but most core tasks still depend on human judgment or manual execution.',
     },
     3: {
         title: 'Moderate',
@@ -56,7 +51,6 @@ function getExposureQuintile(ranking) {
     if (ranking <= 20) return 5;
     if (ranking <= 40) return 4;
     if (ranking <= 60) return 3;
-    if (ranking <= 80) return 2;
     return 1;
 }
 
@@ -124,7 +118,6 @@ function getExposureBadgeStyle(ranking) {
     if (ranking <= 20) return { ...styles, backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5' };
     if (ranking <= 40) return { ...styles, backgroundColor: '#ffedd5', color: '#9a3412', border: '1px solid #fdba74' };
     if (ranking <= 60) return { ...styles, backgroundColor: '#fef9c3', color: '#854d0e', border: '1px solid #fde047' };
-    if (ranking <= 80) return { ...styles, backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac' };
     return { ...styles, backgroundColor: '#bbf7d0', color: '#14532d', border: '1px solid #4ade80' };
 }
 
@@ -190,17 +183,15 @@ function TieredSteps({ occupations, getRankingFn, onOccupationClick, selectedIte
         { label: '1-20', displayLabel: 'Very High', range: [1, 20], color: '#dc2626' },    // Red
         { label: '21-40', displayLabel: 'High', range: [21, 40], color: '#f97316' },       // Orange
         { label: '41-60', displayLabel: 'Moderate', range: [41, 60], color: '#eab308' },   // Yellow
-        { label: '61-80', displayLabel: 'Low', range: [61, 80], color: '#22c55e' },        // Green
-        { label: '81-100', displayLabel: 'Very Low', range: [81, 100], color: '#16a34a' }, // Dark Green
+        { label: '61-100', displayLabel: 'Lowest', range: [61, 100], color: '#16a34a' },   // Dark Green
     ];
 
-    // Determine which tier (0-4) based on ranking (1-100)
+    // Determine which tier (0-3) based on ranking (1-100)
     const getTierIndex = (rank) => {
         if (rank <= 20) return 0;
         if (rank <= 40) return 1;
         if (rank <= 60) return 2;
-        if (rank <= 80) return 3;
-        return 4;
+        return 3;
     };
 
     // Group occupations by their tier
@@ -800,7 +791,7 @@ function EmploymentChangeChart({
                         How to read the exposure groups
                     </p>
                     <ul style={{ margin: '4px 0 0 0', paddingLeft: '20px', lineHeight: '1.5', color: '#334155' }}>
-                        <li>Jobs range from Very High to Very Low exposure.</li>
+                        <li>Jobs range from Very High to Lowest exposure.</li>
                         <li>More exposure means more tasks in that job can be done or helped by AI.</li>
                         <li>Less exposure means fewer tasks can currently be done by AI.</li>
                         <li>Similar-sounding occupations may have different exposure levels due to differences in tasks.</li>
@@ -817,8 +808,7 @@ function getExposureLevel(ranking) {
     if (ranking <= 20) return { level: 'Very High', color: '#dc2626' };  // Red
     if (ranking <= 40) return { level: 'High', color: '#f97316' };       // Orange
     if (ranking <= 60) return { level: 'Moderate', color: '#eab308' };   // Yellow
-    if (ranking <= 80) return { level: 'Low', color: '#22c55e' };        // Green
-    return { level: 'Very Low', color: '#16a34a' };                      // Dark Green
+    return { level: 'Lowest', color: '#16a34a' };                        // Dark Green
 }
 
 // Helper function to get button background color based on ranking
@@ -826,8 +816,7 @@ function getButtonColor(ranking) {
     if (ranking <= 20) return '#fee2e2'; // Light red for very high exposure
     if (ranking <= 40) return '#ffedd5'; // Light orange for high exposure
     if (ranking <= 60) return '#fef9c3'; // Light yellow for moderate exposure
-    if (ranking <= 80) return '#dcfce7'; // Light green for low exposure
-    return '#bbf7d0'; // Lighter green for very low exposure
+    return '#bbf7d0'; // Light green for lowest exposure
 }
 
 // Helper: format education code into display text and whether it's bachelor's+
@@ -1855,7 +1844,6 @@ function AIExposureVisualization() {
                                                                 selectedMeta.textLabel === 'very high' ? 'This means most of the tasks in this occupation can be done or helped by AI.'
                                                                 : selectedMeta.textLabel === 'high' ? 'This means many of the tasks in this occupation can be done or helped by AI.'
                                                                 : selectedMeta.textLabel === 'moderate' ? 'This means some of the tasks in this occupation can be done or helped by AI.'
-                                                                : selectedMeta.textLabel === 'low' ? 'This means few of the tasks in this occupation can currently be done by AI.'
                                                                 : 'This means very few of the tasks in this occupation can currently be done by AI.';
                                                             const direction = selectedChange >= 0 ? 'growth' : 'decline';
                                                             const workers = Math.round(Math.abs(selectedChange));
@@ -2100,7 +2088,6 @@ function AIExposureVisualization() {
                                         selectedMeta.textLabel === 'very high' ? 'This means most of the tasks in this occupation can be done or helped by AI.'
                                         : selectedMeta.textLabel === 'high' ? 'This means many of the tasks in this occupation can be done or helped by AI.'
                                         : selectedMeta.textLabel === 'moderate' ? 'This means some of the tasks in this occupation can be done or helped by AI.'
-                                        : selectedMeta.textLabel === 'low' ? 'This means few of the tasks in this occupation can currently be done by AI.'
                                         : 'This means very few of the tasks in this occupation can currently be done by AI.';
                                     const direction = selectedChange >= 0 ? 'growth' : 'decline';
                                     const workers = Math.round(Math.abs(selectedChange));
@@ -2282,8 +2269,7 @@ function AIExposureVisualization() {
                                 { level: 'Very High', color: '#dc2626' },
                                 { level: 'High', color: '#f97316' },
                                 { level: 'Moderate', color: '#eab308' },
-                                { level: 'Low', color: '#22c55e' },
-                                { level: 'Very Low', color: '#16a34a' }
+                                { level: 'Lowest', color: '#16a34a' }
                             ].map(({ level, color }) => {
                                 const isActive = exposureFilters.has(level);
                                 return (
@@ -2483,7 +2469,6 @@ function AIExposureVisualization() {
                                             selectedMeta.textLabel === 'very high' ? 'This means most of the tasks in this occupation can be done or helped by AI.'
                                             : selectedMeta.textLabel === 'high' ? 'This means many of the tasks in this occupation can be done or helped by AI.'
                                             : selectedMeta.textLabel === 'moderate' ? 'This means some of the tasks in this occupation can be done or helped by AI.'
-                                            : selectedMeta.textLabel === 'low' ? 'This means few of the tasks in this occupation can currently be done by AI.'
                                             : 'This means very few of the tasks in this occupation can currently be done by AI.';
                                         const direction = selectedChange >= 0 ? 'growth' : 'decline';
                                         const workers = Math.round(Math.abs(selectedChange));
