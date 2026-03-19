@@ -2626,18 +2626,20 @@ function AIExposureVisualization() {
             {!showTop && !ranked && !showSearch && showEnd && (
                 <>
                     <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                        gap: '15px',
-                        marginBottom: '30px'
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        minHeight: '300px',
                     }}>
                         <div style={{
                             backgroundColor: 'white',
-                            padding: '15px',
+                            padding: '30px 40px',
                             borderRadius: '8px',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                            maxWidth: '600px',
+                            textAlign: 'center'
                         }}>
-                            <p>Thank you for completing this portion of the survey. Please click &gt; at the bottom right of the page to continue the survey. You may need to scroll all the way to the bottom of the survey screen to see it.</p>
+                            <p style={{ fontSize: '16px', lineHeight: '1.6' }}>Thank you for completing this portion of the survey. Please click the <strong>&rarr;</strong> button at the bottom right of the page to continue the survey. You may need to scroll down to see it.</p>
                         </div>
                     </div>
                 </>
