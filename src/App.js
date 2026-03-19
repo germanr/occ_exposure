@@ -955,6 +955,7 @@ function AIExposureVisualization() {
                 const relatedSoc1Index = headers.indexOf('related_soc_code_1');
                 const relatedSoc2Index = headers.indexOf('related_soc_code_2');
                 const relatedSoc3Index = headers.indexOf('related_soc_code_3');
+                const altTitlesIndex = headers.indexOf('alt_titles');
 
                 if (rankingIndex === -1 || occupationIndex === -1) {
                     throw new Error('CSV must have "ranking" and "occupation" columns');
@@ -993,6 +994,10 @@ function AIExposureVisualization() {
                     const related_soc_code_2 = relatedSoc2Index !== -1 ? (values[relatedSoc2Index]?.trim().replace(/^"|"$/g, '') || '') : '';
                     const related_soc_code_3 = relatedSoc3Index !== -1 ? (values[relatedSoc3Index]?.trim().replace(/^"|"$/g, '') || '') : '';
 
+                    // Parse alt_titles (pipe-delimited string)
+                    const altTitlesRaw = altTitlesIndex !== -1 ? (values[altTitlesIndex]?.trim().replace(/^"|"$/g, '') || '') : '';
+                    const alt_titles = altTitlesRaw ? altTitlesRaw.split(' | ').map(t => t.trim()).filter(Boolean) : [];
+
                     if (occupation && !isNaN(ranking)) {
                         const occObj = {
                             id: i - 1,
@@ -1006,6 +1011,7 @@ function AIExposureVisualization() {
                             related_soc_code_1: related_soc_code_1,
                             related_soc_code_2: related_soc_code_2,
                             related_soc_code_3: related_soc_code_3,
+                            alt_titles: alt_titles,
                         };
                         data[occupation.toLowerCase()] = ranking;
                         occList.push(occObj);
@@ -1032,13 +1038,28 @@ function AIExposureVisualization() {
                     // Match each passed occupation to the closest in the data
                     const matched = passedOccs.map(typed => {
                         const typedLower = typed.toLowerCase().trim();
-                        // 1. Exact case-insensitive match
+                        // 1. Exact case-insensitive match on main name
                         let match = occList.find(o => o.name.toLowerCase() === typedLower);
                         if (!match) {
-                            // 2. Substring match (occupation contains typed or typed contains occupation)
+                            // 2. Exact match on alt titles
+                            match = occList.find(o =>
+                                o.alt_titles && o.alt_titles.some(alt => alt.toLowerCase() === typedLower)
+                            );
+                        }
+                        if (!match) {
+                            // 3. Substring match (occupation contains typed or typed contains occupation)
                             match = occList.find(o =>
                                 o.name.toLowerCase().includes(typedLower) ||
                                 typedLower.includes(o.name.toLowerCase())
+                            );
+                        }
+                        if (!match) {
+                            // 4. Substring match on alt titles
+                            match = occList.find(o =>
+                                o.alt_titles && o.alt_titles.some(alt =>
+                                    alt.toLowerCase().includes(typedLower) ||
+                                    typedLower.includes(alt.toLowerCase())
+                                )
                             );
                         }
                         return { typed, match: match || null };
@@ -1099,8 +1120,10 @@ function AIExposureVisualization() {
         clearTimeout(searchDebounceRef.current);
         if (value.trim()) {
             searchDebounceRef.current = setTimeout(() => {
+                const lv = value.toLowerCase();
                 const resultCount = occupationList.filter(item =>
-                    item.name.toLowerCase().includes(value.toLowerCase())
+                    item.name.toLowerCase().includes(lv) ||
+                    (item.alt_titles && item.alt_titles.some(alt => alt.toLowerCase().includes(lv)))
                 ).length;
                 logSearchEvent('search', { term: value.trim(), resultCount });
             }, 500);
@@ -1218,9 +1241,13 @@ function AIExposureVisualization() {
     // Use occupations from CSV file
     let data = [...occupationList];
 
-    // Apply search filter
+    // Apply search filter (matches against main name and alt titles)
     if (searchTerm) {
-        data = data.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+        const term = searchTerm.toLowerCase();
+        data = data.filter(item =>
+            item.name.toLowerCase().includes(term) ||
+            (item.alt_titles && item.alt_titles.some(alt => alt.toLowerCase().includes(term)))
+        );
     }
 
     // Apply filters (only active on page 4: !showSearch && !ranked && !showTop)
@@ -1654,7 +1681,13 @@ function AIExposureVisualization() {
                             height: '250px',
                             overflowY: 'scroll'
                         }}>
-                            {data.map((item, index) => (
+                            {data.map((item, index) => {
+                                const term = searchTerm?.toLowerCase() || '';
+                                const nameMatches = item.name.toLowerCase().includes(term);
+                                const matchingAlt = !nameMatches && term && item.alt_titles
+                                    ? item.alt_titles.find(alt => alt.toLowerCase().includes(term))
+                                    : null;
+                                return (
                                 <div
                                     key={index}
                                     onClick={() => handleItemClick(item)}
@@ -1670,9 +1703,17 @@ function AIExposureVisualization() {
                                         backgroundColor: 'transparent'
                                     }}
                                 >
-                                    {item.name}
+                                    <span>
+                                        {item.name}
+                                        {matchingAlt && (
+                                            <span style={{ color: '#6b7280', fontSize: '0.85em', marginLeft: '6px' }}>
+                                                (also known as: {matchingAlt})
+                                            </span>
+                                        )}
+                                    </span>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                     <div style={{
@@ -2408,7 +2449,13 @@ function AIExposureVisualization() {
                                 overflowY: 'scroll'
                             }}
                         >
-                            {data.map((item, index) => (
+                            {data.map((item, index) => {
+                                const term = searchTerm?.toLowerCase() || '';
+                                const nameMatches = item.name.toLowerCase().includes(term);
+                                const matchingAlt = !nameMatches && term && item.alt_titles
+                                    ? item.alt_titles.find(alt => alt.toLowerCase().includes(term))
+                                    : null;
+                                return (
                                 <div
                                     key={index}
                                     onClick={() => handleItemClickEnd(item)}
@@ -2424,9 +2471,17 @@ function AIExposureVisualization() {
                                         backgroundColor: 'transparent'
                                     }}
                                 >
-                                    {item.name}
+                                    <span>
+                                        {item.name}
+                                        {matchingAlt && (
+                                            <span style={{ color: '#6b7280', fontSize: '0.85em', marginLeft: '6px' }}>
+                                                (also known as: {matchingAlt})
+                                            </span>
+                                        )}
+                                    </span>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
 
