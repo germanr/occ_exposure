@@ -943,7 +943,7 @@ function AIExposureVisualization() {
 
                 // Parse CSV
                 const lines = text.trim().split('\n');
-                const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/^"|"$/g, ''));
 
                 const rankingIndex = headers.indexOf('ranking');
                 const occupationIndex = headers.indexOf('occupation');
