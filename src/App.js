@@ -912,9 +912,6 @@ function AIExposureVisualization() {
     // Field of study filter
     const [fieldOfStudyFilter, setFieldOfStudyFilter] = useState('');
 
-    // Qualtrics occupation pass-through via URL parameters
-    const [preselectedOccupations, setPreselectedOccupations] = useState(null);
-
     // Get correct listing of elements. Ex. X, Y, and Z
     const listFormatter = new Intl.ListFormat('en-US', { style: 'long', type: 'conjunction' });
 
@@ -1026,46 +1023,6 @@ function AIExposureVisualization() {
                 setOccupationList(occList);
                 setSocCodeMap(socMap);
                 setCsvLoading(false);
-
-                // Check for URL parameters (Qualtrics occupation pass-through)
-                const params = new URLSearchParams(window.location.search);
-                const passedOccs = [];
-                for (let i = 1; i <= 6; i++) {
-                    const name = params.get(`occ${i}`);
-                    if (name) passedOccs.push(decodeURIComponent(name));
-                }
-                if (passedOccs.length > 0) {
-                    // Match each passed occupation to the closest in the data
-                    const matched = passedOccs.map(typed => {
-                        const typedLower = typed.toLowerCase().trim();
-                        // 1. Exact case-insensitive match on main name
-                        let match = occList.find(o => o.name.toLowerCase() === typedLower);
-                        if (!match) {
-                            // 2. Exact match on alt titles
-                            match = occList.find(o =>
-                                o.alt_titles && o.alt_titles.some(alt => alt.toLowerCase() === typedLower)
-                            );
-                        }
-                        if (!match) {
-                            // 3. Substring match (occupation contains typed or typed contains occupation)
-                            match = occList.find(o =>
-                                o.name.toLowerCase().includes(typedLower) ||
-                                typedLower.includes(o.name.toLowerCase())
-                            );
-                        }
-                        if (!match) {
-                            // 4. Substring match on alt titles
-                            match = occList.find(o =>
-                                o.alt_titles && o.alt_titles.some(alt =>
-                                    alt.toLowerCase().includes(typedLower) ||
-                                    typedLower.includes(alt.toLowerCase())
-                                )
-                            );
-                        }
-                        return { typed, match: match || null };
-                    });
-                    setPreselectedOccupations(matched);
-                }
             } catch (err) {
                 console.error('CSV fetch error:', err);
                 setCsvError(err.message);
@@ -1550,7 +1507,7 @@ function AIExposureVisualization() {
             }}>Exploring the Impact of Artificial Intelligence (AI)</h1>
 
             {/* Displays additional header for the first page */}
-            {showSearch && !preselectedOccupations && (
+            {showSearch && (
                 <p style={{
                     textAlign: 'center',
                     marginBottom: '30px',
@@ -1560,16 +1517,6 @@ function AIExposureVisualization() {
                     Please select the 6 occupations you previously entered. Use the search bar below to find and click on each occupation to add it to your list.
                     <br />
                     As a reminder, these are the top 6 occupations you would consider for your future career.
-                </p>
-            )}
-            {showSearch && preselectedOccupations && (
-                <p style={{
-                    textAlign: 'center',
-                    marginBottom: '30px',
-                    color: 'black',
-                    lineHeight: '1.6'
-                }}>
-                    These are the occupations you listed:
                 </p>
             )}
 
@@ -1585,60 +1532,7 @@ function AIExposureVisualization() {
             )}
 
             {/* Displays the first page */}
-            {showSearch && preselectedOccupations && (
-                <div style={{
-                    backgroundColor: 'white',
-                    padding: '20px',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                    marginBottom: '30px'
-                }}>
-                    <ol style={{ paddingLeft: '20px', marginBottom: '20px', lineHeight: '2', fontSize: '1rem' }}>
-                        {preselectedOccupations.map((item, idx) => (
-                            <li key={idx} style={{
-                                color: item.match ? '#222' : '#9ca3af'
-                            }}>
-                                {item.match ? item.match.name : item.typed}
-                                {!item.match && (
-                                    <span style={{ fontSize: '0.85rem', marginLeft: '8px', fontStyle: 'italic' }}>
-                                        (not found in database)
-                                    </span>
-                                )}
-                            </li>
-                        ))}
-                    </ol>
-                    <button
-                        onClick={() => {
-                            const matchedItems = preselectedOccupations
-                                .filter(item => item.match)
-                                .map(item => item.match);
-                            setList(matchedItems);
-                            // Directly replicate handleSubmit logic since list state won't update until next render
-                            setRanked([...matchedItems]);
-                            setShowSearch(false);
-                            updateTimeSpentPages(0, timeSpent);
-                            setTimeSpent(0);
-                            setSearchTerm('');
-                        }}
-                        disabled={preselectedOccupations.filter(item => item.match).length === 0}
-                        style={{
-                            cursor: 'pointer',
-                            padding: '10px 24px',
-                            fontSize: '1rem',
-                            fontWeight: '600',
-                            backgroundColor: '#2563eb',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            display: 'block',
-                            margin: '0 auto'
-                        }}
-                    >
-                        Confirm
-                    </button>
-                </div>
-            )}
-            {showSearch && !preselectedOccupations && (
+            {showSearch && (
                 <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
