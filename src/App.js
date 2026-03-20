@@ -902,6 +902,7 @@ function AIExposureVisualization() {
     const detailOpenTimeRef = useRef(null);
     const searchDebounceRef = useRef(null);
     const maxScrollRef = useRef(0);
+    const containerRef = useRef(null);
 
     // Exposure-level filter buttons for page 4
     const [exposureFilters, setExposureFilters] = useState(new Set());
@@ -1455,6 +1456,19 @@ function AIExposureVisualization() {
         window.parent.postMessage("showNextButton", "*");
     };
 
+    // Post content height to parent iframe for dynamic resizing
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const observer = new ResizeObserver(entries => {
+            for (const entry of entries) {
+                const height = Math.ceil(entry.borderBoxSize?.[0]?.blockSize ?? entry.target.scrollHeight);
+                window.parent.postMessage({ type: 'resizeIframe', height: height + 40 }, '*');
+            }
+        });
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, []);
+
     // Show loading state while fetching CSV
     if (csvLoading) {
         return (
@@ -1488,7 +1502,7 @@ function AIExposureVisualization() {
     const topOccupations = getTopOccupations();
 
     return (
-        <div style={{
+        <div ref={containerRef} style={{
             maxWidth: '800px',
             margin: '0 auto',
             padding: '20px',
