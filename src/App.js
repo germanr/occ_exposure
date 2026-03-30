@@ -28,21 +28,25 @@ const QUINTILE_META = {
     1: {
         title: 'Lowest',
         textLabel: 'lowest',
+        color: '#16a34a',
         explanation: 'These occupations rely on tasks AI currently struggles with, for example physical, hands-on, or highly context-specific work.',
     },
     3: {
         title: 'Moderate',
         textLabel: 'moderate',
+        color: '#eab308',
         explanation: 'These occupations combine tasks AI can support with tasks where workers still need to verify, adapt, and make final decisions.',
     },
     4: {
         title: 'High',
         textLabel: 'high',
+        color: '#f97316',
         explanation: 'Workers in these occupations often use AI for writing, analysis, and decision support. This reflects task exposure and augmentation, not automatic replacement.',
     },
     5: {
         title: 'Very High',
         textLabel: 'very high',
+        color: '#dc2626',
         explanation: '',
     },
 };
@@ -419,6 +423,7 @@ function EmploymentChangeChart({
         labelTop: QUINTILE_META[q].title,
         labelBottom: 'AI Exposure',
         value: employmentChangeByQuintile[q],
+        tierColor: QUINTILE_META[q].color,
     })).filter((d) => Number.isFinite(d.value));
 
     const markerAnnotations = annotations
@@ -661,7 +666,7 @@ function EmploymentChangeChart({
                     const x = chartLeft + idx * slotWidth + (slotWidth - barWidth) / 2;
                     const y = d.value >= 0 ? yScale(d.value) : zeroY;
                     const height = Math.max(2, Math.abs(yScale(d.value) - zeroY));
-                    const fill = getEmploymentColor(d.value);
+                    const fill = d.tierColor;
                     const stroke = '#33415522';
                     const valueLabelY = d.value >= 0 ? y - 8 : y + height + 16;
 
